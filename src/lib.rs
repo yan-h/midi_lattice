@@ -1,6 +1,9 @@
 use nih_plug::prelude::*;
-use nih_plug_egui::{create_egui_editor, egui, EguiState};
+use nih_plug_vizia::ViziaState;
 use std::sync::Arc;
+
+mod assets;
+mod editor;
 
 // This is a shortened version of the gain example with most comments removed, check out
 // https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
@@ -11,18 +14,19 @@ struct MidiLattice {
 
 #[derive(Params)]
 struct MidiLatticeParams {
-    /// The parameter's ID is used to identify the parameter in the wrappred plugin API. As long as
+    /// The parameter's ID is used to identify the parameter in the wrapped plugin API. As long as
     /// these IDs remain constant, you can rename and reorder these fields as you wish. The
-    /// parameters are exposed to the host in the same order they were defined. In this case, this
-    /// gain parameter is stored as linear gain while the values are displayed in decibels.
+    /// parameters are exposed to the host in the same order they were defined.
+
     #[persist = "editor-state"]
-    editor_state: Arc<EguiState>,
+    editor_state: Arc<ViziaState>,
 }
 
 impl Default for MidiLatticeParams {
     fn default() -> Self {
+        nih_log!("created default params");
         Self {
-            editor_state: EguiState::from_size(500, 500),
+            editor_state: ViziaState::new(|| (400, 200)),
         }
     }
 }
@@ -94,21 +98,12 @@ impl Plugin for MidiLattice {
         // Resize buffers and perform other potentially expensive initialization operations here.
         // The `reset()` function is always called right after this function. You can remove this
         // function if you do not need it.
-        nih_log!("MidiLattice plugin initialized");
+        nih_log!("plugin initialized");
         true
     }
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        let _params = self.params.clone();
-        create_egui_editor(
-            self.params.editor_state.clone(),
-            (),
-            |_, _| {},
-            move |egui_ctx, _setter, _state| {
-                egui::CentralPanel::default().show(egui_ctx, |ui| {
-                    ui.label("test label 4");
-                });
-            },
-        )
+        nih_log!("editor() called");
+        editor::create(self.params.clone())
     }
 }
 
