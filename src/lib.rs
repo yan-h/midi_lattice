@@ -1,15 +1,30 @@
+use crate::midi::DisplayNoteEvent;
+use crate::midi::{Voice, VoiceKey};
+use heapless::FnvIndexMap;
+use midi::update_voices;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
-use std::sync::Arc;
+
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
+use triple_buffer::{Input, Output, TripleBuffer};
 
 mod assets;
 mod editor;
+mod midi;
+
+type Voices = FnvIndexMap<VoiceKey, Voice, 256>;
 
 // This is a shortened version of the gain example with most comments removed, check out
 // https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
 // started
 struct MidiLattice {
     params: Arc<MidiLatticeParams>,
+
+    voices: Voices,
+    voices_input: Input<Voices>,
+    voices_output: Arc<Mutex<Output<Voices>>>,
 }
 
 #[derive(Params)]
@@ -26,15 +41,20 @@ impl Default for MidiLatticeParams {
     fn default() -> Self {
         nih_log!("created default params");
         Self {
-            editor_state: ViziaState::new(|| (400, 200)),
+            editor_state: ViziaState::new(|| (500, 500)),
         }
     }
 }
 
 impl Default for MidiLattice {
     fn default() -> Self {
+        nih_log!("default");
+        let (input, output) = TripleBuffer::default().split();
         Self {
             params: Arc::new(MidiLatticeParams::default()),
+            voices: FnvIndexMap::new(),
+            voices_input: input,
+            voices_output: Arc::new(Mutex::new(output)),
         }
     }
 }
@@ -62,10 +82,10 @@ impl Plugin for MidiLattice {
         names: PortNames::const_default(),
     }];
 
-    const MIDI_INPUT: MidiConfig = MidiConfig::None;
-    const MIDI_OUTPUT: MidiConfig = MidiConfig::None;
+    const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
+    const MIDI_OUTPUT: MidiConfig = MidiConfig::MidiCCs;
 
-    const SAMPLE_ACCURATE_AUTOMATION: bool = true;
+    const SAMPLE_ACCURATE_AUTOMATION: bool = false;
 
     // If the plugin can send or receive SysEx messages, it can define a type to wrap around those
     // messages here. The type implements the `SysExMessage` trait, which allows conversion to and
@@ -84,8 +104,36 @@ impl Plugin for MidiLattice {
         &mut self,
         _buffer: &mut Buffer<'_>,
         _aux: &mut AuxiliaryBuffers<'_>,
-        _context: &mut impl ProcessContext<Self>,
+        context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
+        let start_time = Instant::now();
+
+        let mut event_counter = 0;
+
+        while let Some(event) = context.next_event() {
+            update_voices(&mut self.voices, event);
+
+            nih_log!("event: {}", DisplayNoteEvent(event));
+            context.send_event(event);
+
+            event_counter += 1;
+        }
+
+        if event_counter > 1 {
+            self.voices_input.write(self.voices.clone());
+            self.voices_input.publish();
+
+            for v in self.voices.values() {
+                nih_log!("--- voice: {}", v);
+            }
+
+            nih_log!(
+                "*** process() finished in {} us with {} events",
+                start_time.elapsed().as_micros(),
+                event_counter
+            );
+        }
+
         ProcessStatus::Normal
     }
 
@@ -101,9 +149,13 @@ impl Plugin for MidiLattice {
         nih_log!("plugin initialized");
         true
     }
+
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         nih_log!("editor() called");
-        editor::create(self.params.clone())
+        editor::create(editor::Data::new(
+            self.params.clone(),
+            self.voices_output.clone(),
+        ))
     }
 }
 
@@ -115,7 +167,7 @@ impl ClapPlugin for MidiLattice {
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
 
     const CLAP_FEATURES: &'static [ClapFeature] = &[
-        ClapFeature::NoteEffect,
+        ClapFeature::Instrument,
         ClapFeature::Analyzer,
         ClapFeature::Utility,
     ];

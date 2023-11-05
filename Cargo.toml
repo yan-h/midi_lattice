@@ -24,6 +24,11 @@ nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 # the GPL compatibility requirement
 # nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default_features = false, features = ["assert_process_allocs"] }
 nih_plug_vizia = { git = "https://github.com/robbert-vdh/nih-plug.git" }
+rtrb = "0.2.3"
+heapless = "0.7.16"
+triple_buffer = "7.0.0"
+hash32 = "0.2.1"
+hash32-derive = "0.1.1"
 
 [profile.release]
 lto = "thin"
