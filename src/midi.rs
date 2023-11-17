@@ -10,7 +10,7 @@ use std::fmt::Display;
 use crate::Voices;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub(crate) struct Voice {
+pub struct Voice {
     voice_id: Option<i32>,
     channel: u8,
     note: u8,
@@ -73,14 +73,14 @@ impl Display for Voice {
 }
 
 #[derive(PartialEq, Eq, Debug, Hash, Copy, Clone, Hash32)]
-pub(crate) struct VoiceKey {
+pub struct VoiceKey {
     /// The note's channel, in `0..16`.
-    pub(crate) channel: u8,
+    pub channel: u8,
     /// The note's MIDI key number, in `0..128`.
-    pub(crate) note: u8,
+    pub note: u8,
 }
 
-pub(crate) struct DisplayNoteEvent(pub(crate) NoteEvent<()>);
+pub struct DisplayNoteEvent(pub NoteEvent<()>);
 
 impl Display for DisplayNoteEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -125,7 +125,7 @@ impl Display for DisplayNoteEvent {
     }
 }
 
-pub(crate) fn update_voices(voices: &mut Voices, event: NoteEvent<()>) {
+pub fn update_voices(voices: &mut Voices, event: NoteEvent<()>) {
     match event {
         NoteEvent::NoteOn {
             timing: _,

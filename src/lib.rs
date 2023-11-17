@@ -5,6 +5,7 @@ use midi::update_voices;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 
+use std::sync::atomic::AtomicU8;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -13,6 +14,7 @@ use triple_buffer::{Input, Output, TripleBuffer};
 mod assets;
 mod editor;
 mod midi;
+mod tuning;
 
 type Voices = FnvIndexMap<VoiceKey, Voice, 256>;
 
@@ -28,20 +30,109 @@ struct MidiLattice {
 }
 
 #[derive(Params)]
-struct MidiLatticeParams {
+pub struct MidiLatticeParams {
     /// The parameter's ID is used to identify the parameter in the wrapped plugin API. As long as
     /// these IDs remain constant, you can rename and reorder these fields as you wish. The
     /// parameters are exposed to the host in the same order they were defined.
 
     #[persist = "editor-state"]
-    editor_state: Arc<ViziaState>,
+    pub editor_state: Arc<ViziaState>,
+
+    #[nested(group = "lattice")]
+    pub grid_params: Arc<GridParams>,
+
+    #[nested(group = "tuning")]
+    pub tuning_params: TuningParams,
 }
 
-impl Default for MidiLatticeParams {
+#[derive(Params)]
+pub struct GridParams {
+    #[persist = "grid-width"]
+    pub width: Arc<AtomicU8>,
+
+    #[persist = "grid-height"]
+    pub height: Arc<AtomicU8>,
+
+    #[id = "grid-x"]
+    pub x: FloatParam,
+
+    #[id = "grid-y"]
+    pub y: FloatParam,
+}
+
+impl Default for GridParams {
     fn default() -> Self {
+        Self {
+            width: Arc::new(AtomicU8::new(7)),
+            height: Arc::new(AtomicU8::new(7)),
+            x: FloatParam::new(
+                "Lattice X",
+                0.0,
+                FloatRange::Linear {
+                    min: -10.0,
+                    max: 10.0,
+                },
+            ),
+            y: FloatParam::new(
+                "Lattice Y",
+                0.0,
+                FloatRange::Linear {
+                    min: -10.0,
+                    max: 10.0,
+                },
+            ),
+        }
+    }
+}
+
+#[derive(Params)]
+pub struct TuningParams {
+    #[id = "tuning-three"]
+    three: FloatParam,
+    #[id = "tuning-five"]
+    five: FloatParam,
+    #[id = "tuning-seven"]
+    seven: FloatParam,
+}
+
+impl Default for TuningParams {
+    fn default() -> Self {
+        Self {
+            three: FloatParam::new(
+                "Perfect Fifth",
+                700.0,
+                FloatRange::Linear {
+                    min: 650.0,
+                    max: 750.0,
+                },
+            ),
+            five: FloatParam::new(
+                "Major Third",
+                400.0,
+                FloatRange::Linear {
+                    min: 340.0,
+                    max: 440.0,
+                },
+            ),
+            seven: FloatParam::new(
+                "Harmonic Seventh",
+                1000.0,
+                FloatRange::Linear {
+                    min: 920.0,
+                    max: 1020.0,
+                },
+            ),
+        }
+    }
+}
+
+impl MidiLatticeParams {
+    fn new(grid_params: Arc<GridParams>) -> Self {
         nih_log!("created default params");
         Self {
-            editor_state: ViziaState::new(|| (500, 500)),
+            editor_state: editor::vizia_state(grid_params.clone()),
+            grid_params: grid_params,
+            tuning_params: TuningParams::default(),
         }
     }
 }
@@ -51,7 +142,7 @@ impl Default for MidiLattice {
         nih_log!("default");
         let (input, output) = TripleBuffer::default().split();
         Self {
-            params: Arc::new(MidiLatticeParams::default()),
+            params: Arc::new(MidiLatticeParams::new(Arc::default())),
             voices: FnvIndexMap::new(),
             voices_input: input,
             voices_output: Arc::new(Mutex::new(output)),
