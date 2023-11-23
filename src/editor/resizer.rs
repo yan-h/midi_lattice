@@ -17,11 +17,7 @@ use nih_plug_vizia::widgets::GuiContextEvent;
 
 use nih_plug::prelude::{GuiContext, Param, ParamPtr};
 
-use crate::editor::height_to_grid_height;
-use crate::editor::CONTAINER_COLOR;
-
-use super::HIGHLIGHT_COLOR;
-use super::NODE_COLOR;
+use crate::editor::*;
 
 pub struct Resizer {
     drag_active: bool,
@@ -137,17 +133,13 @@ impl View for Resizer {
 
         let icon_line_width: f32 = CONTAINER_CORNER_RADIUS * scale;
         let icon_padding: f32 = CONTAINER_CORNER_RADIUS * scale + icon_line_width * 0.5;
-        let mut icon_paint = match self.drag_active
+        let color = match self.drag_active
             || intersects_box(bounds, (cx.mouse.cursorx, cx.mouse.cursory))
         {
-            true => vg::Paint::color(HIGHLIGHT_COLOR),
-            false => vg::Paint::color(NODE_COLOR),
+            true => HIGHLIGHT_COLOR,
+            false => NODE_COLOR,
         };
-        icon_paint.set_line_width(icon_line_width);
-        icon_paint.set_line_cap(vg::LineCap::Round);
-        icon_paint.set_line_cap_end(vg::LineCap::Round);
-        icon_paint.set_line_cap_start(vg::LineCap::Round);
-        icon_paint.set_line_join(vg::LineJoin::Round);
+        let icon_paint = make_icon_paint(color, scale);
         let mut icon_path = vg::Path::new();
         // top right
         icon_path.move_to(bounds.x + bounds.w - icon_padding, bounds.y + icon_padding);
@@ -163,11 +155,5 @@ impl View for Resizer {
         icon_path.close();
 
         canvas.stroke_path(&mut icon_path, &icon_paint);
-        //canvas.fill_path(&mut icon_path, &icon_paint);
     }
-}
-
-/// Test whether a point intersects with the triangle of this resize handle.
-fn intersects_box(bounds: BoundingBox, (x, y): (f32, f32)) -> bool {
-    x >= bounds.x && y >= bounds.y && x <= bounds.x + bounds.w && y <= bounds.y + bounds.h
 }

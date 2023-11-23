@@ -2,25 +2,32 @@ use crate::MidiLatticeParams;
 use crate::Voices;
 
 use crate::assets;
+use crate::tuning::NoteNameInfo;
+use crate::tuning::PrimeCountVector;
 use nih_plug::{nih_dbg, nih_log};
 use nih_plug_vizia::vizia::cache::BoundingBox;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use triple_buffer::Output;
 
 use crate::editor::{
     CONTAINER_COLOR, CONTAINER_CORNER_RADIUS, CONTAINER_PADDING, HIGHLIGHT_COLOR, NODE_COLOR,
 };
 
-pub const NODE_SIZE: f32 = 100.0;
+pub const NODE_SIZE: f32 = 40.0;
 pub const INNER_PADDING: f32 = CONTAINER_PADDING;
 pub const NODE_GAP: f32 = CONTAINER_PADDING;
 
 pub struct Lattice {
     params: Arc<MidiLatticeParams>,
     voices_output: Arc<Mutex<Output<Voices>>>,
+
+    // Need interior mutability just to allow mutation from &self in draw()
+    loaded_font: AtomicBool,
 }
 
 pub struct Node {
@@ -41,6 +48,7 @@ impl Lattice {
         Self {
             params: params.get(cx),
             voices_output: voices_output.get(cx),
+            loaded_font: AtomicBool::new(false),
         }
         .build(
             cx,
@@ -56,12 +64,17 @@ impl View for Lattice {
     }
 
     fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
+        let start_time = Instant::now();
+
         let mut voices_output = self.voices_output.lock().unwrap();
 
-        canvas.add_font_mem(assets::QUICKSAND_REGULAR);
+        // Load font if we haven't already
+        if !self.loaded_font.load(Ordering::Relaxed) {
+            let _ = canvas.add_font_mem(assets::JET_BRAINS_MONO_REGULAR);
+            self.loaded_font.store(true, Ordering::Relaxed);
+        }
 
         let voices: &Voices = voices_output.read();
-        let mut nodes: Vec<Node> = Vec::with_capacity(49);
         let bounds = cx.bounds();
 
         let three: f32 = self.params.tuning_params.three.value() * 0.01;
@@ -72,56 +85,50 @@ impl View for Lattice {
             self.params.grid_params.width.load(Ordering::Relaxed),
             self.params.grid_params.height.load(Ordering::Relaxed),
         );
-        let (x_tuning_offset, y_tuning_offset) = (
-            -(((grid_width - 1) / 2) as i32),
-            -((grid_height / 2) as i32),
-        );
+        let (x_tuning_offset, y_tuning_offset) =
+            (((grid_width - 1) / 2) as i32, ((grid_height / 2) as i32));
 
         let scale: f32 = cx.style.dpi_factor as f32;
 
-        let container_width: f32 = (INNER_PADDING * 2.0
-            + NODE_SIZE * grid_width as f32
-            + NODE_GAP * (grid_width as f32 - 1.0))
-            * scale;
-        let container_height: f32 = (INNER_PADDING * 2.0
-            + NODE_SIZE * grid_height as f32
-            + NODE_GAP * (grid_height as f32 - 1.0))
-            * scale;
+        let mut nodes: Vec<Node> =
+            Vec::with_capacity(usize::from(grid_width as usize * grid_height as usize));
 
         let mut container_path = vg::Path::new();
         container_path.rounded_rect(
-            CONTAINER_PADDING * scale,
-            CONTAINER_PADDING * scale,
-            container_width,
-            container_height,
+            bounds.x,
+            bounds.y,
+            bounds.w,
+            bounds.h,
             CONTAINER_CORNER_RADIUS * scale,
         );
+
         container_path.close();
         canvas.fill_path(&mut container_path, &vg::Paint::color(CONTAINER_COLOR));
 
         // x = threes
-        for x_offset in 0..grid_width {
+        for x_offset in 0..(grid_width as i32) {
             // y = fives
-            for y_offset in 0..grid_height {
+            for y_offset in 0..(grid_height as i32) {
                 let (x, y) = (
-                    (CONTAINER_PADDING
-                        + INNER_PADDING
-                        + (x_offset as f32) * NODE_SIZE
-                        + (x_offset as f32) * NODE_GAP)
-                        * scale,
-                    (CONTAINER_PADDING
-                        + INNER_PADDING
-                        + (y_offset as f32) * NODE_SIZE
-                        + (y_offset as f32) * NODE_GAP)
-                        * scale,
+                    bounds.x
+                        + (INNER_PADDING
+                            + (x_offset as f32) * NODE_SIZE
+                            + (x_offset as f32) * NODE_GAP)
+                            * scale,
+                    bounds.y
+                        + (INNER_PADDING
+                            + (y_offset as f32) * NODE_SIZE
+                            + (y_offset as f32) * NODE_GAP)
+                            * scale,
                 );
-                let (tuning_x, tuning_y) = (
-                    x_offset as i32 + x_tuning_offset,
-                    y_offset as i32 + y_tuning_offset,
+                let primes = PrimeCountVector::new(
+                    y_tuning_offset - i32::from(y_offset),
+                    i32::from(x_offset - x_tuning_offset),
+                    0,
                 );
-                let pitch_class: f32 =
-                    (three * (tuning_x as f32) + five * (tuning_y as f32)) % 12.0;
+                let note_name_info: NoteNameInfo = primes.note_name_info();
 
+                // Background rectangle
                 let mut path = vg::Path::new();
                 path.rounded_rect(
                     x,
@@ -131,26 +138,46 @@ impl View for Lattice {
                     (CONTAINER_CORNER_RADIUS - INNER_PADDING * 0.5) * scale,
                 );
                 path.close();
+                canvas.fill_path(&mut path, &vg::Paint::color(NODE_COLOR));
 
-                let paint = vg::Paint::color(NODE_COLOR);
-                let origin_paint = vg::Paint::color(vg::Color::rgb(0xff, 0xff, 0x00));
-                if tuning_x == 0 && tuning_y == 0 {
-                    canvas.fill_path(&mut path, &origin_paint);
-                } else {
-                    canvas.fill_path(&mut path, &paint);
-                }
+                // Draw text
                 let mut text_paint = vg::Paint::color(HIGHLIGHT_COLOR);
-                text_paint.set_font_size(NODE_SIZE * 0.5 * scale);
-                text_paint.set_text_align(vg::Align::Center);
+                text_paint.set_font_size(NODE_SIZE * 0.65 * scale);
+                text_paint.set_text_align(vg::Align::Right);
 
+                // Note letter name
                 let _ = canvas.fill_text(
-                    x + NODE_SIZE * 0.5 * scale,
+                    x + NODE_SIZE * 0.48 * scale,
                     y + NODE_SIZE * 0.65 * scale,
-                    format!("{} {}", tuning_x, tuning_y),
+                    format!("{}", note_name_info.letter_name),
+                    &text_paint,
+                );
+
+                // Sharps or flats
+                text_paint.set_font_size(NODE_SIZE * 0.33 * scale);
+                text_paint.set_text_align(vg::Align::Left);
+                let _ = canvas.fill_text(
+                    x + NODE_SIZE * 0.47 * scale,
+                    y + NODE_SIZE * 0.38 * scale,
+                    note_name_info.sharps_or_flats_str(),
+                    &text_paint,
+                );
+
+                // Syntonic commas
+                let _ = canvas.fill_text(
+                    x + NODE_SIZE * 0.47 * scale,
+                    y + NODE_SIZE * 0.67 * scale,
+                    note_name_info.syntonic_comma_str(),
                     &text_paint,
                 );
             }
         }
+        /*
+        nih_log!(
+            "*** draw() finished in {} us",
+            start_time.elapsed().as_micros()
+        );
+        */
     }
 
     fn event(&mut self, _cx: &mut EventContext, _event: &mut Event) {}
