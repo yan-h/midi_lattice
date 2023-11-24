@@ -14,7 +14,10 @@ pub struct Voice {
     voice_id: Option<i32>,
     channel: u8,
     note: u8,
+    // Pitch in semitones
     pitch: f32,
+    // Pitch class in cents
+    pitch_class: f32,
 }
 
 impl Eq for Voice {}
@@ -43,6 +46,7 @@ impl Voice {
             channel,
             note,
             pitch: note as f32,
+            pitch_class: (note as f32 * 100.0).rem_euclid(1200.0),
         }
     }
 
@@ -55,10 +59,11 @@ impl Voice {
 
     fn set_tuning(&mut self, tuning_offset: f32) {
         self.pitch = (self.note as f32) + tuning_offset;
+        self.pitch_class = (self.pitch as f32 * 100.0).rem_euclid(1200.0)
     }
 
-    fn get_pitch_class(&self) -> f32 {
-        self.pitch % 12.0
+    pub fn get_pitch_class(&self) -> f32 {
+        self.pitch_class
     }
 }
 
@@ -136,7 +141,7 @@ pub fn update_voices(voices: &mut Voices, event: NoteEvent<()>) {
         } => {
             match voices.insert(
                 VoiceKey { note, channel },
-                Voice::new(voice_id, note, channel),
+                Voice::new(voice_id, channel, note),
             ) {
                 Ok(Some(_)) => {
                     nih_error!(

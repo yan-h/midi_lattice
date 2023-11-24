@@ -2,9 +2,14 @@ use std::ops::Div;
 
 use nih_plug::nih_log;
 
+use crate::TuningParams;
+
 pub const THREE_JUST: f32 = 7.0195500;
 pub const FIVE_JUST: f32 = 3.863137;
 pub const SEVEN_JUST: f32 = 9.6882590;
+
+// Two cent values are considered equal if their difference is less than this
+pub const CENTS_EPSILON: f32 = 0.001;
 
 /// Representation of a pitch class, in terms of how many factors of 3, 5, and 7 it has
 /// C = (0, 0, 0)
@@ -12,6 +17,16 @@ pub struct PrimeCountVector {
     pub threes: i32,
     pub fives: i32,
     pub sevens: i32,
+}
+
+impl PrimeCountVector {
+    pub fn cents(&self, three_cents: f32, five_cents: f32, seven_cents: f32) -> f32 {
+        (self.threes as f32 * three_cents
+            + self.fives as f32 * five_cents
+            + self.sevens as f32 * seven_cents)
+            .rem_euclid(1200.0)
+            .abs()
+    }
 }
 
 static NOTE_NAMES: [char; 7] = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];

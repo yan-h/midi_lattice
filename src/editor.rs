@@ -29,10 +29,10 @@ mod lattice;
 mod resizer;
 mod scale_button;
 
-pub const BOTTOM_REGION_HEIGHT: f32 = lattice::NODE_SIZE * 0.85 + CONTAINER_PADDING * 2.0;
-pub const RIGHT_REGION_WIDTH: f32 = lattice::NODE_SIZE * 0.85 + CONTAINER_PADDING * 2.0;
+pub const BOTTOM_REGION_HEIGHT: f32 = lattice::NODE_SIZE * 0.7 + CONTAINER_PADDING * 2.0;
+pub const RIGHT_REGION_WIDTH: f32 = lattice::NODE_SIZE * 0.7 + CONTAINER_PADDING * 2.0;
 
-pub const CONTAINER_PADDING: f32 = NODE_SIZE * 0.12;
+pub const CONTAINER_PADDING: f32 = NODE_SIZE * 0.1;
 pub const CONTAINER_CORNER_RADIUS: f32 = CONTAINER_PADDING;
 
 #[derive(Lens, Clone)]
@@ -59,15 +59,15 @@ pub const NON_GRID_HEIGHT: f32 = BOTTOM_REGION_HEIGHT + CONTAINER_PADDING * 2.0;
 pub const NON_GRID_WIDTH: f32 = RIGHT_REGION_WIDTH + CONTAINER_PADDING * 2.0;
 
 pub const NODE_COLOR: vg::Color = vg::Color::rgbf(
-    0x80 as f32 / 255.0,
-    0x80 as f32 / 255.0,
-    0x80 as f32 / 255.0,
+    0x76 as f32 / 255.0,
+    0x76 as f32 / 255.0,
+    0x76 as f32 / 255.0,
 );
 
 pub const CONTAINER_COLOR: vg::Color = vg::Color::rgbf(
-    0x58 as f32 / 255.0,
-    0x58 as f32 / 255.0,
-    0x58 as f32 / 255.0,
+    0x50 as f32 / 255.0,
+    0x50 as f32 / 255.0,
+    0x50 as f32 / 255.0,
 );
 
 pub const HIGHLIGHT_COLOR: vg::Color = vg::Color::rgbf(

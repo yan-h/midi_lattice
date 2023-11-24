@@ -85,6 +85,7 @@ impl Default for GridParams {
     }
 }
 
+/// Tuning information for each prime number, in cents
 #[derive(Params)]
 pub struct TuningParams {
     #[id = "tuning-three"]
@@ -209,10 +210,11 @@ impl Plugin for MidiLattice {
 
             event_counter += 1;
         }
+        //nih_dbg!(&self.voices.clone());
 
-        if event_counter > 1 {
+        if event_counter > 0 {
             self.voices_input.write(self.voices.clone());
-            self.voices_input.publish();
+            // self.voices_input.publish();
 
             for v in self.voices.values() {
                 nih_log!("--- voice: {}", v);
