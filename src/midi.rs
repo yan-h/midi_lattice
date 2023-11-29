@@ -50,13 +50,6 @@ impl Voice {
         }
     }
 
-    fn get_key(&self) -> VoiceKey {
-        VoiceKey {
-            channel: self.channel,
-            note: self.note,
-        }
-    }
-
     fn set_tuning(&mut self, tuning_offset: f32) {
         self.pitch = (self.note as f32) + tuning_offset;
         self.pitch_class = (self.pitch as f32 * 100.0).rem_euclid(1200.0)

@@ -4,6 +4,7 @@ use heapless::FnvIndexMap;
 use midi::update_voices;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
+use tuning::*;
 
 use std::sync::atomic::AtomicU8;
 use std::sync::{Arc, Mutex};
@@ -42,7 +43,7 @@ pub struct MidiLatticeParams {
     pub grid_params: Arc<GridParams>,
 
     #[nested(group = "tuning")]
-    pub tuning_params: TuningParams,
+    pub tuning_params: Arc<TuningParams>,
 }
 
 #[derive(Params)]
@@ -60,6 +61,8 @@ pub struct GridParams {
     pub y: FloatParam,
 }
 
+pub const GRID_MAX_DISTANCE: f32 = 100.0;
+
 impl Default for GridParams {
     fn default() -> Self {
         Self {
@@ -69,16 +72,16 @@ impl Default for GridParams {
                 "Lattice X",
                 0.0,
                 FloatRange::Linear {
-                    min: -10.0,
-                    max: 10.0,
+                    min: -GRID_MAX_DISTANCE,
+                    max: GRID_MAX_DISTANCE,
                 },
             ),
             y: FloatParam::new(
                 "Lattice Y",
                 0.0,
                 FloatRange::Linear {
-                    min: -10.0,
-                    max: 10.0,
+                    min: -GRID_MAX_DISTANCE,
+                    max: GRID_MAX_DISTANCE,
                 },
             ),
         }
@@ -101,26 +104,26 @@ impl Default for TuningParams {
         Self {
             three: FloatParam::new(
                 "Perfect Fifth",
-                700.0,
+                THREE_12TET,
                 FloatRange::Linear {
-                    min: 650.0,
-                    max: 750.0,
+                    min: MIN_THREE,
+                    max: MAX_THREE,
                 },
             ),
             five: FloatParam::new(
                 "Major Third",
-                400.0,
+                FIVE_12TET,
                 FloatRange::Linear {
-                    min: 340.0,
-                    max: 440.0,
+                    min: MIN_FIVE,
+                    max: MAX_FIVE,
                 },
             ),
             seven: FloatParam::new(
                 "Harmonic Seventh",
-                1000.0,
+                SEVEN_12TET,
                 FloatRange::Linear {
-                    min: 920.0,
-                    max: 1020.0,
+                    min: MIN_SEVEN,
+                    max: MAX_SEVEN,
                 },
             ),
         }
@@ -133,7 +136,7 @@ impl MidiLatticeParams {
         Self {
             editor_state: editor::vizia_state(grid_params.clone()),
             grid_params: grid_params,
-            tuning_params: TuningParams::default(),
+            tuning_params: Arc::new(TuningParams::default()),
         }
     }
 }
@@ -214,7 +217,6 @@ impl Plugin for MidiLattice {
 
         if event_counter > 0 {
             self.voices_input.write(self.voices.clone());
-            // self.voices_input.publish();
 
             for v in self.voices.values() {
                 nih_log!("--- voice: {}", v);

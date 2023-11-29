@@ -1,40 +1,45 @@
-use crate::editor::lattice;
-use crate::editor::lattice::NODE_SIZE;
-use crate::editor::width_to_grid_width;
-use crate::editor::CONTAINER_CORNER_RADIUS;
-use crate::GridParams;
-use nih_plug::{nih_dbg, nih_log};
-use nih_plug_vizia::vizia::cache::BoundingBox;
+//! A resize handle for uniformly scaling a plugin GUI.
+
+use crate::editor::{
+    intersects_box, COLOR_1, COLOR_2, COLOR_3, CONTAINER_CORNER_RADIUS, CONTAINER_PADDING,
+};
+use nih_plug::nih_dbg;
+use nih_plug::prelude::nih_log;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
-use std::sync::atomic::AtomicU8;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::time::Duration;
-use std::time::Instant;
 
-use nih_plug_vizia::widgets::GuiContextEvent;
+use super::make_icon_stroke_paint;
+use super::COLOR_0;
 
-use nih_plug::prelude::{GuiContext, Param, ParamPtr};
-
-use crate::editor::*;
-
+/// A resize handle placed at the bottom right of the window that lets you resize the window.
+///
+/// Needs to be the last element in the GUI because of how event targetting in Vizia works right
+/// now.
 pub struct Resizer {
+    /// Will be set to `true` if we're dragging the parameter. Resetting the parameter or entering a
+    /// text value should not initiate a drag.
     drag_active: bool,
-    last_vertical_resize_time: Instant,
-    grid_params: Arc<GridParams>,
+
+    /// The scale factor when we started dragging. This is kept track of separately to avoid
+    /// accumulating rounding errors.
+    start_scale_factor: f64,
+    /// The DPI factor when we started dragging, includes both the HiDPI scaling and the user
+    /// scaling factor. This is kept track of separately to avoid accumulating rounding errors.
+    start_dpi_factor: f32,
+    /// The cursor position in physical screen pixels when the drag started.
+    start_physical_coordinates: (f32, f32),
 }
 
 impl Resizer {
-    pub fn new<LGridParams>(cx: &mut Context, grid_params: LGridParams) -> Handle<Self>
-    where
-        LGridParams: Lens<Target = Arc<GridParams>>,
-    {
+    /// Create a resize handle at the bottom right of the window. This should be created at the top
+    /// level. Dragging this handle around will cause the window to be resized.
+    pub fn new(cx: &mut Context) -> Handle<Self> {
         // Styling is done in the style sheet
         Resizer {
             drag_active: false,
-            last_vertical_resize_time: Instant::now(),
-            grid_params: grid_params.get(cx),
+            start_scale_factor: 1.0,
+            start_dpi_factor: 1.0,
+            start_physical_coordinates: (0.0, 0.0),
         }
         .build(cx, |_| {})
     }
@@ -42,27 +47,26 @@ impl Resizer {
 
 impl View for Resizer {
     fn element(&self) -> Option<&'static str> {
-        Some("resizer")
+        Some("resize-handle")
     }
 
     fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
         event.map(|window_event, meta| match *window_event {
             WindowEvent::MouseDown(MouseButton::Left) => {
-                if intersects_box(
-                    cx.cache.get_bounds(cx.current()),
-                    (cx.mouse.cursorx, cx.mouse.cursory),
-                ) {
-                    cx.capture();
-                    cx.set_active(true);
+                cx.capture();
+                cx.set_active(true);
+                nih_log!("down");
 
-                    self.drag_active = true;
-
-                    meta.consume();
-                } else {
-                    // TODO: The click should be forwarded to the element behind the triangle
-                }
+                self.drag_active = true;
+                self.start_scale_factor = cx.user_scale_factor();
+                self.start_dpi_factor = cx.scale_factor();
+                self.start_physical_coordinates = (
+                    cx.mouse().cursorx * self.start_dpi_factor,
+                    cx.mouse().cursory * self.start_dpi_factor,
+                );
             }
             WindowEvent::MouseUp(MouseButton::Left) => {
+                nih_log!("up");
                 if self.drag_active {
                     cx.release();
                     cx.set_active(false);
@@ -71,37 +75,24 @@ impl View for Resizer {
                 }
             }
             WindowEvent::MouseMove(x, y) => {
-                cx.set_hover(intersects_box(cx.cache.get_bounds(cx.current()), (x, y)));
-
                 if self.drag_active {
-                    let (width, height) = (
-                        width_to_grid_width(
-                            (cx.mouse.cursorx / cx.style.dpi_factor as f32) + lattice::NODE_SIZE,
-                        ),
-                        height_to_grid_height(
-                            (cx.mouse.cursory / cx.style.dpi_factor as f32) + lattice::NODE_SIZE,
-                        ),
-                    );
+                    // We need to convert our measurements into physical pixels relative to the
+                    // initial drag to be able to keep a consistent ratio. This 'relative to the
+                    // start' bit is important because otherwise we would be comparing the position
+                    // to the same absoltue screen spotion.
+                    // TODO: This may start doing fun things when the window grows so large that it
+                    //       gets pushed upwards or leftwards
+                    let (compensated_physical_x, compensated_physical_y) =
+                        (x * self.start_dpi_factor, y * self.start_dpi_factor);
+                    let (start_physical_x, start_physical_y) = self.start_physical_coordinates;
+                    let new_scale_factor = (self.start_scale_factor
+                        * (compensated_physical_x / start_physical_x)
+                            .max(compensated_physical_y / start_physical_y)
+                            as f64)
+                        .max(0.5)
+                        .min(4.0);
 
-                    let (width_changed, height_changed) = (
-                        self.grid_params.width.load(Ordering::Relaxed) != width,
-                        // Limit frequency of height changes to reduce "flickering" on MacOS
-                        self.grid_params.height.load(Ordering::Relaxed) != height
-                            && Instant::now().duration_since(self.last_vertical_resize_time)
-                                > Duration::from_millis(50),
-                    );
-
-                    if width_changed {
-                        self.grid_params.width.store(width, Ordering::Relaxed);
-                    }
-                    if height_changed {
-                        self.grid_params.height.store(height, Ordering::Relaxed);
-                        self.last_vertical_resize_time = Instant::now();
-                    }
-
-                    if width_changed || height_changed {
-                        cx.emit(GuiContextEvent::Resize);
-                    }
+                    cx.set_user_scale_factor(new_scale_factor);
                 }
             }
             _ => {}
@@ -109,13 +100,10 @@ impl View for Resizer {
     }
 
     fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
-        let scale: f32 = cx.style.dpi_factor as f32;
-
-        // These basics are taken directly from the default implementation of this function
+        let scale: f32 = cx.scale_factor() as f32;
         let bounds = cx.bounds();
-        if bounds.w == 0.0 || bounds.h == 0.0 {
-            return;
-        }
+        let highlighted: bool =
+            self.drag_active || intersects_box(bounds, (cx.mouse().cursorx, cx.mouse().cursory));
 
         let mut container_path = vg::Path::new();
         container_path.rounded_rect(
@@ -128,18 +116,13 @@ impl View for Resizer {
         container_path.close();
 
         // Fill with background color
-        let paint = vg::Paint::color(CONTAINER_COLOR);
+        let paint = vg::Paint::color(if highlighted { COLOR_2 } else { COLOR_1 });
         canvas.fill_path(&mut container_path, &paint);
 
         let icon_line_width: f32 = CONTAINER_CORNER_RADIUS * scale;
         let icon_padding: f32 = CONTAINER_CORNER_RADIUS * scale + icon_line_width * 0.5;
-        let color = match self.drag_active
-            || intersects_box(bounds, (cx.mouse.cursorx, cx.mouse.cursory))
-        {
-            true => HIGHLIGHT_COLOR,
-            false => NODE_COLOR,
-        };
-        let icon_paint = make_icon_paint(color, scale);
+        let color = COLOR_0;
+        let icon_paint = make_icon_stroke_paint(color, scale);
         let mut icon_path = vg::Path::new();
         // top right
         icon_path.move_to(bounds.x + bounds.w - icon_padding, bounds.y + icon_padding);

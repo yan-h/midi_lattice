@@ -1,15 +1,29 @@
-use std::ops::Div;
+pub const THREE_JUST: f32 = 701.95500;
+pub const FIVE_JUST: f32 = 386.3137;
+pub const SEVEN_JUST: f32 = 968.82590;
 
-use nih_plug::nih_log;
+pub const THREE_12TET: f32 = 700.0;
+pub const FIVE_12TET: f32 = 400.0;
+pub const SEVEN_12TET: f32 = 1000.0;
 
-use crate::TuningParams;
+pub static MIN_THREE: f32 = THREE_JUST - TUNING_RANGE_OFFSET;
+pub static MAX_THREE: f32 = THREE_JUST + TUNING_RANGE_OFFSET;
+pub static MIN_FIVE: f32 = FIVE_JUST - TUNING_RANGE_OFFSET;
+pub static MAX_FIVE: f32 = FIVE_JUST + TUNING_RANGE_OFFSET;
+pub static MIN_SEVEN: f32 = SEVEN_JUST - TUNING_RANGE_OFFSET;
+pub static MAX_SEVEN: f32 = SEVEN_JUST + TUNING_RANGE_OFFSET;
 
-pub const THREE_JUST: f32 = 7.0195500;
-pub const FIVE_JUST: f32 = 3.863137;
-pub const SEVEN_JUST: f32 = 9.6882590;
+pub const TUNING_RANGE_OFFSET: f32 = 40.0;
 
 // Two cent values are considered equal if their difference is less than this
 pub const CENTS_EPSILON: f32 = 0.001;
+
+/// Pitch classes are considered equal if they are within 1/1000 of a cent.
+/// Some tolerance above f32 epsilon is nice to ensure that we ignore drift from
+/// multiplying a generator interval.
+pub fn pitch_classes_equal(a: f32, b: f32) -> bool {
+    (a - b).abs() <= CENTS_EPSILON
+}
 
 /// Representation of a pitch class, in terms of how many factors of 3, 5, and 7 it has
 /// C = (0, 0, 0)
@@ -20,12 +34,15 @@ pub struct PrimeCountVector {
 }
 
 impl PrimeCountVector {
+    // Cents value of a pitch class, given tunings for 3, 5 and 7
     pub fn cents(&self, three_cents: f32, five_cents: f32, seven_cents: f32) -> f32 {
-        (self.threes as f32 * three_cents
-            + self.fives as f32 * five_cents
-            + self.sevens as f32 * seven_cents)
+        // Convert to f64 to avoid loss of precision from multiplying f32 by large numbers
+        // Might not matter, but this makes me feel safer
+        (self.threes as f64 * three_cents as f64
+            + self.fives as f64 * five_cents as f64
+            + self.sevens as f64 * seven_cents as f64)
             .rem_euclid(1200.0)
-            .abs()
+            .abs() as f32
     }
 }
 

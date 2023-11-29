@@ -11,10 +11,12 @@ pub const QUICKSAND_BOLD: &[u8] = include_bytes!("../assets/quicksand/Quicksand-
 pub const ROBOTO_MONO_REGULAR: &[u8] =
     include_bytes!("../assets/roboto_mono/RobotoMono-Regular.ttf");
 
+pub const ROBOTO_REGULAR: &[u8] = include_bytes!("../assets/roboto/Roboto-Regular.ttf");
+
 pub fn register_quicksand(cx: &mut Context) {
-    cx.add_fonts_mem(&[QUICKSAND_LIGHT]);
-    cx.add_fonts_mem(&[QUICKSAND_REGULAR]);
-    cx.add_fonts_mem(&[QUICKSAND_MEDIUM]);
-    cx.add_fonts_mem(&[QUICKSAND_SEMIBOLD]);
-    cx.add_fonts_mem(&[QUICKSAND_BOLD]);
+    cx.add_font_mem(QUICKSAND_LIGHT);
+    cx.add_font_mem(QUICKSAND_REGULAR);
+    cx.add_font_mem(QUICKSAND_MEDIUM);
+    cx.add_font_mem(QUICKSAND_SEMIBOLD);
+    cx.add_font_mem(QUICKSAND_BOLD);
 }
