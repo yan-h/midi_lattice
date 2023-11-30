@@ -40,7 +40,7 @@ impl View for GridResizer {
     }
 
     fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
-        event.map(|lattice_event, meta| match *lattice_event {
+        event.map(|lattice_event, _meta| match *lattice_event {
             LatticeEvent::MouseOver => cx.set_visibility(Visibility::Visible),
             LatticeEvent::MouseOut => cx.set_visibility(Visibility::Hidden),
             LatticeEvent::MouseDown => {
@@ -86,9 +86,7 @@ impl View for GridResizer {
                     self.grid_params.width.store(width, Ordering::Relaxed);
                     self.grid_params.height.store(height, Ordering::Relaxed);
 
-                    //if width_changed || height_changed {
                     cx.emit(GuiContextEvent::Resize);
-                    //}
                 }
             }
             _ => {}

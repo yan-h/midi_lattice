@@ -118,11 +118,17 @@ impl View for Grid {
         let (tuning_x_offset, tuning_y_offset) =
             (((grid_width - 1) / 2) as i32, (grid_height / 2) as i32);
 
+        // When grid x or y is not a round number, we need to add a row or column to avoid blanks
+        let (extra_right, extra_top) = (
+            if grid_x == grid_x.round() { 0 } else { 1 },
+            if grid_y == grid_y.round() { 0 } else { 1 },
+        );
+
         // Draw lattice nodes one by one
         // x = threes
-        for x in -1..grid_width + 1 {
+        for x in 0..grid_width + extra_right {
             // y = fives
-            for y in -1..grid_height + 1 {
+            for y in -extra_top..grid_height {
                 // Number of factors of each prime in the pitch class represented by this node
                 let primes = PrimeCountVector::new(
                     tuning_y_offset - i32::from(y) + (grid_y.floor() as i32),

@@ -7,15 +7,11 @@ use crate::GRID_MAX_DISTANCE;
 use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::widgets::param_base::ParamWidgetBase;
+use nih_plug_vizia::widgets::ParamEvent;
 use std::sync::Arc;
 
 /// Draggable region on the lattice. When moused over, shows a visual indicator that it's draggable.
 pub struct DragRegion {
-    // For writing grid params
-    grid_x_param_base: ParamWidgetBase,
-    grid_y_param_base: ParamWidgetBase,
-
-    // For reading grid params
     grid_params: Arc<GridParams>,
 
     // Whether something else is being dragged on the lattice.
@@ -40,9 +36,6 @@ impl DragRegion {
     {
         // Styling is done in the style sheet
         DragRegion {
-            //param_setter: ParamSetter { raw_context: () }
-            grid_x_param_base: ParamWidgetBase::new(cx, grid_params.clone(), |p| &p.x),
-            grid_y_param_base: ParamWidgetBase::new(cx, grid_params.clone(), |p| &p.y),
             grid_params: grid_params.get(cx),
             lattice_mouse_down: false,
             mouse_over: false,
@@ -90,25 +83,31 @@ impl View for DragRegion {
                     (self.grid_params.x.value(), self.grid_params.y.value());
             }
             WindowEvent::MouseUp(MouseButton::Left) => {
-                nih_log!("center mouse up");
                 cx.emit(LatticeEvent::MouseUpFromChild);
 
                 if self.drag_active {
                     cx.release();
                     self.drag_active = false;
-                    self.grid_x_param_base.begin_set_parameter(cx);
-                    self.grid_x_param_base.set_normalized_value(
-                        cx,
-                        normalize_grid_position(self.grid_params.x.value().round()),
-                    );
-                    self.grid_x_param_base.end_set_parameter(cx);
 
-                    self.grid_y_param_base.begin_set_parameter(cx);
-                    self.grid_y_param_base.set_normalized_value(
-                        cx,
-                        normalize_grid_position(self.grid_params.y.value().round()),
+                    cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.x).upcast());
+                    cx.emit(
+                        ParamEvent::SetParameter(
+                            &self.grid_params.x,
+                            self.grid_params.x.value().round(),
+                        )
+                        .upcast(),
                     );
-                    self.grid_y_param_base.end_set_parameter(cx);
+                    cx.emit(ParamEvent::EndSetParameter(&self.grid_params.x).upcast());
+
+                    cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.y).upcast());
+                    cx.emit(
+                        ParamEvent::SetParameter(
+                            &self.grid_params.y,
+                            self.grid_params.y.value().round(),
+                        )
+                        .upcast(),
+                    );
+                    cx.emit(ParamEvent::EndSetParameter(&self.grid_params.y).upcast());
                 }
             }
             WindowEvent::MouseOver => {
@@ -130,19 +129,19 @@ impl View for DragRegion {
                     let grid_y_offset = (mouse_y - start_physical_coordinates_y)
                         / (cx.scale_factor() * (NODE_SIZE + CONTAINER_PADDING));
 
-                    self.grid_x_param_base.begin_set_parameter(cx);
-                    self.grid_x_param_base.set_normalized_value(
-                        cx,
-                        normalize_grid_position(start_grid_x - grid_x_offset),
+                    cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.x).upcast());
+                    cx.emit(
+                        ParamEvent::SetParameter(&self.grid_params.x, start_grid_x - grid_x_offset)
+                            .upcast(),
                     );
-                    self.grid_x_param_base.end_set_parameter(cx);
+                    cx.emit(ParamEvent::EndSetParameter(&self.grid_params.x).upcast());
 
-                    self.grid_y_param_base.begin_set_parameter(cx);
-                    self.grid_y_param_base.set_normalized_value(
-                        cx,
-                        normalize_grid_position(start_grid_y + grid_y_offset),
+                    cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.y).upcast());
+                    cx.emit(
+                        ParamEvent::SetParameter(&self.grid_params.y, start_grid_y + grid_y_offset)
+                            .upcast(),
                     );
-                    self.grid_y_param_base.end_set_parameter(cx);
+                    cx.emit(ParamEvent::EndSetParameter(&self.grid_params.y).upcast());
                 }
             }
             _ => {}

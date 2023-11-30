@@ -138,13 +138,18 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
     create_vizia_editor(
         data.params.editor_state.clone(),
         ViziaTheming::None,
-        move |cx, _| {
+        move |cx, gui_cx| {
             let _ = cx.add_stylesheet(include_str!("../assets/theme.css"));
-
+            //ParamSetter::new(_gui_ctx.as_ref());
             assets::register_quicksand(cx);
             cx.set_default_font(&[assets::QUICKSAND]);
 
             data.clone().build(cx);
+
+            let timer = cx.add_timer(Duration::from_millis(100), None, |cx, _| {
+                nih_log!("tick asdf");
+            });
+            cx.start_timer(timer);
 
             HStack::new(cx, |cx| {
                 let button_dimensions = BOTTOM_REGION_HEIGHT - CONTAINER_PADDING * 2.0;

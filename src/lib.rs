@@ -213,20 +213,20 @@ impl Plugin for MidiLattice {
 
             event_counter += 1;
         }
-        //nih_dbg!(&self.voices.clone());
 
         if event_counter > 0 {
             self.voices_input.write(self.voices.clone());
 
             for v in self.voices.values() {
-                nih_log!("--- voice: {}", v);
+                //nih_log!("--- voice: {}", v);
             }
-
+            /*
             nih_log!(
                 "*** process() finished in {} us with {} events",
                 start_time.elapsed().as_micros(),
                 event_counter
             );
+            */
         }
 
         ProcessStatus::Normal
@@ -260,6 +260,10 @@ impl ClapPlugin for MidiLattice {
         Some("Visualizes incoming MIDI in a tuning lattice");
     const CLAP_MANUAL_URL: Option<&'static str> = Some(Self::URL);
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
+    const CLAP_POLY_MODULATION_CONFIG: Option<PolyModulationConfig> = Some(PolyModulationConfig {
+        max_voice_capacity: 256,
+        supports_overlapping_voices: true,
+    });
 
     const CLAP_FEATURES: &'static [ClapFeature] = &[
         ClapFeature::Instrument,
