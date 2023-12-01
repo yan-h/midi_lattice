@@ -5,11 +5,9 @@ use nih_plug_vizia::widgets::ParamEvent;
 use triple_buffer::Output;
 
 use crate::midi::Voice;
-use crate::tuning::{
-    FIVE_12TET, FIVE_JUST, MAX_FIVE, MAX_SEVEN, MAX_THREE, MIN_FIVE, MIN_SEVEN, MIN_THREE,
-    SEVEN_12TET, SEVEN_JUST, THREE_12TET, THREE_JUST, TUNING_RANGE_OFFSET,
-};
+use crate::tuning::*;
 use crate::{TuningParams, Voices};
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -116,43 +114,52 @@ impl View for TuningLearnButton {
 }
 
 // How close an interval needs to be to its just interval to be autodetected
-const LEARN_RANGE: f32 = 20.0;
+const LEARN_RANGE: PitchClassDistance = PitchClassDistance::from_cents(20);
 
 impl TuningLearnButton {
-    // Tunes primes 3, 5, and 7 to the best approximation within the current sounding intervals.
-    // Only considers approximations within `LEARN_RANGE` cents of the true interval.
+    /// Tunes primes 3, 5, and 7 to the best approximation among the current sounding pitch classes.
+    /// Only considers approximations within [`LEARN_RANGE`] cents of the true interval.
     fn learn_tuning(&self, cx: &mut EventContext) {
         let mut voices_output = self.voices_output.lock().unwrap();
-        let voices: Vec<Voice> = voices_output.read().values().cloned().collect();
+        let mut pitch_classes: Vec<PitchClass> = voices_output
+            .read()
+            .values()
+            .map(|voice| voice.get_pitch_class())
+            .collect();
         std::mem::drop(voices_output);
+        pitch_classes.sort_unstable();
+        pitch_classes.dedup();
 
-        let mut best_three: Option<f32> = None;
-        let mut best_five: Option<f32> = None;
-        let mut best_seven: Option<f32> = None;
+        let mut best_three: Option<PitchClass> = None;
+        let mut best_five: Option<PitchClass> = None;
+        let mut best_seven: Option<PitchClass> = None;
 
-        let update_best_tuning = |best: &mut Option<f32>, target: f32, interval: f32| {
-            if interval >= target - LEARN_RANGE && interval <= target + LEARN_RANGE {
-                let diff: f32 = (interval - target).abs();
-                match best {
-                    Some(tuning) => {
-                        if diff < (target - *tuning).abs() {
+        let update_best_tuning =
+            |best: &mut Option<PitchClass>, interval: PitchClass, target: PitchClass| {
+                let diff = interval.distance_to(target);
+                if diff <= LEARN_RANGE {
+                    match best {
+                        Some(best_tuning) => {
+                            if diff < best_tuning.distance_to(target) {
+                                *best = Some(interval);
+                            }
+                        }
+                        None => {
                             *best = Some(interval);
                         }
                     }
-                    None => {
-                        *best = Some(interval);
-                    }
                 }
-            }
-        };
+            };
 
-        let mut i = voices.iter();
-        while let Some(voice_a) = i.next() {
+        let mut i = pitch_classes.iter();
+        while let Some(pc_a) = i.next() {
             let mut j = i.clone();
-            while let Some(voice_b) = j.next() {
-                let interval: f32 =
-                    (voice_a.get_pitch_class() - voice_b.get_pitch_class()).rem_euclid(1200.0);
-                let flipped_interval: f32 = 1200.0 - interval;
+            while let Some(pc_b) = j.next() {
+                // Test A - B as well as B - A.
+                // For example, a tuning for the perfect fourth implies a one for the perfect fifth.
+                // This is true because this plugin assumes perfectly tuned octaves.
+                let interval: PitchClass = *pc_a - *pc_b;
+                let flipped_interval: PitchClass = -interval;
                 /*
                 nih_log!(
                     "{} {} | {} {}",
@@ -161,21 +168,21 @@ impl TuningLearnButton {
                     interval,
                     flipped_interval
                 );*/
-                update_best_tuning(&mut best_three, THREE_JUST, interval);
-                update_best_tuning(&mut best_five, FIVE_JUST, interval);
-                update_best_tuning(&mut best_seven, SEVEN_JUST, interval);
-                update_best_tuning(&mut best_three, THREE_JUST, flipped_interval);
-                update_best_tuning(&mut best_five, FIVE_JUST, flipped_interval);
-                update_best_tuning(&mut best_seven, SEVEN_JUST, flipped_interval);
+                update_best_tuning(&mut best_three, interval, THREE_JUST);
+                update_best_tuning(&mut best_five, interval, FIVE_JUST);
+                update_best_tuning(&mut best_seven, interval, SEVEN_JUST);
+                update_best_tuning(&mut best_three, flipped_interval, THREE_JUST);
+                update_best_tuning(&mut best_five, flipped_interval, FIVE_JUST);
+                update_best_tuning(&mut best_seven, flipped_interval, SEVEN_JUST);
             }
         }
 
         let mut update_tuning_param =
-            |tuning_param: &FloatParam, opt_tuning: Option<f32>| match opt_tuning {
+            |tuning_param: &FloatParam, opt_tuning: Option<PitchClass>| match opt_tuning {
                 Some(tuning) => {
                     // nih_dbg!(tuning);
                     cx.emit(ParamEvent::BeginSetParameter(tuning_param).upcast());
-                    cx.emit(ParamEvent::SetParameter(tuning_param, tuning).upcast());
+                    cx.emit(ParamEvent::SetParameter(tuning_param, tuning.to_cents_f32()).upcast());
                     cx.emit(ParamEvent::EndSetParameter(tuning_param).upcast());
                 }
                 None => (),

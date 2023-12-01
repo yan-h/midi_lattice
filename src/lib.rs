@@ -19,9 +19,6 @@ mod tuning;
 
 type Voices = FnvIndexMap<VoiceKey, Voice, 256>;
 
-// This is a shortened version of the gain example with most comments removed, check out
-// https://github.com/robbert-vdh/nih-plug/blob/master/plugins/examples/gain/src/lib.rs to get
-// started
 struct MidiLattice {
     params: Arc<MidiLatticeParams>,
 
@@ -32,14 +29,11 @@ struct MidiLattice {
 
 #[derive(Params)]
 pub struct MidiLatticeParams {
-    /// The parameter's ID is used to identify the parameter in the wrapped plugin API. As long as
-    /// these IDs remain constant, you can rename and reorder these fields as you wish. The
-    /// parameters are exposed to the host in the same order they were defined.
-
+    /// Editor state. This plugin mostly cares about it because it stores window size.
     #[persist = "editor-state"]
     pub editor_state: Arc<ViziaState>,
 
-    #[nested(group = "lattice")]
+    #[nested(group = "grid")]
     pub grid_params: Arc<GridParams>,
 
     #[nested(group = "tuning")]
@@ -48,20 +42,24 @@ pub struct MidiLatticeParams {
 
 #[derive(Params)]
 pub struct GridParams {
+    /// Width of the grid display, in grid nodes
     #[persist = "grid-width"]
     pub width: Arc<AtomicU8>,
 
+    // Height of the grid display, in grid nodes
     #[persist = "grid-height"]
     pub height: Arc<AtomicU8>,
 
+    // X offset of the grid from the origin, C
     #[id = "grid-x"]
     pub x: FloatParam,
 
+    // Y offset of the grid from the origin, C
     #[id = "grid-y"]
     pub y: FloatParam,
 }
 
-pub const GRID_MAX_DISTANCE: f32 = 100.0;
+const MAX_GRID_OFFSET: f32 = 20.0;
 
 impl Default for GridParams {
     fn default() -> Self {
@@ -69,61 +67,66 @@ impl Default for GridParams {
             width: Arc::new(AtomicU8::new(7)),
             height: Arc::new(AtomicU8::new(7)),
             x: FloatParam::new(
-                "Lattice X",
+                "Grid X",
                 0.0,
                 FloatRange::Linear {
-                    min: -GRID_MAX_DISTANCE,
-                    max: GRID_MAX_DISTANCE,
+                    min: -MAX_GRID_OFFSET,
+                    max: MAX_GRID_OFFSET,
                 },
             ),
             y: FloatParam::new(
-                "Lattice Y",
+                "Grid Y",
                 0.0,
                 FloatRange::Linear {
-                    min: -GRID_MAX_DISTANCE,
-                    max: GRID_MAX_DISTANCE,
+                    min: -MAX_GRID_OFFSET,
+                    max: MAX_GRID_OFFSET,
                 },
             ),
         }
     }
 }
 
-/// Tuning information for each prime number, in cents
+/// Tuning information for each prime harmonic, in cents
 #[derive(Params)]
 pub struct TuningParams {
     #[id = "tuning-three"]
     three: FloatParam,
+
     #[id = "tuning-five"]
     five: FloatParam,
+
     #[id = "tuning-seven"]
     seven: FloatParam,
 }
+
+// Range for the tuning parameter for each prime harmonic
+const MAX_TUNING_OFFSET: f32 = 40.0;
 
 impl Default for TuningParams {
     fn default() -> Self {
         Self {
             three: FloatParam::new(
                 "Perfect Fifth",
-                THREE_12TET,
+                THREE_12TET_F32,
                 FloatRange::Linear {
-                    min: MIN_THREE,
-                    max: MAX_THREE,
+                    min: THREE_JUST_F32 - MAX_TUNING_OFFSET,
+                    max: THREE_JUST_F32 + MAX_TUNING_OFFSET,
                 },
             ),
             five: FloatParam::new(
                 "Major Third",
-                FIVE_12TET,
+                FIVE_12TET_F32,
                 FloatRange::Linear {
-                    min: MIN_FIVE,
-                    max: MAX_FIVE,
+                    min: FIVE_JUST_F32 - MAX_TUNING_OFFSET,
+                    max: FIVE_JUST_F32 + MAX_TUNING_OFFSET,
                 },
             ),
             seven: FloatParam::new(
                 "Harmonic Seventh",
-                SEVEN_12TET,
+                SEVEN_12TET_F32,
                 FloatRange::Linear {
-                    min: MIN_SEVEN,
-                    max: MAX_SEVEN,
+                    min: SEVEN_JUST_F32 - MAX_TUNING_OFFSET,
+                    max: SEVEN_JUST_F32 + MAX_TUNING_OFFSET,
                 },
             ),
         }

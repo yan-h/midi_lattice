@@ -26,8 +26,8 @@ mod resizer;
 mod scale_button;
 mod tuning_learn_button;
 
-pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.7 + CONTAINER_PADDING * 2.0;
-pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.7 + CONTAINER_PADDING * 2.0;
+pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.75 + CONTAINER_PADDING * 2.0;
+pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.75 + CONTAINER_PADDING * 2.0;
 
 pub const CONTAINER_PADDING: f32 = grid::NODE_SIZE * 0.09;
 pub const CONTAINER_CORNER_RADIUS: f32 = CONTAINER_PADDING;

@@ -7,6 +7,7 @@ use nih_plug::{nih_error, nih_log};
 use std::fmt;
 use std::fmt::Display;
 
+use crate::tuning::PitchClass;
 use crate::Voices;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -16,8 +17,7 @@ pub struct Voice {
     note: u8,
     // Pitch in semitones
     pitch: f32,
-    // Pitch class in cents
-    pitch_class: f32,
+    pitch_class: PitchClass,
 }
 
 impl Eq for Voice {}
@@ -46,16 +46,16 @@ impl Voice {
             channel,
             note,
             pitch: note as f32,
-            pitch_class: (note as f32 * 100.0).rem_euclid(1200.0),
+            pitch_class: PitchClass::from_midi_note(note),
         }
     }
 
     fn set_tuning(&mut self, tuning_offset: f32) {
         self.pitch = (self.note as f32) + tuning_offset;
-        self.pitch_class = (self.pitch as f32 * 100.0).rem_euclid(1200.0)
+        self.pitch_class = self.pitch_class.with_midi_tuning_offset(tuning_offset);
     }
 
-    pub fn get_pitch_class(&self) -> f32 {
+    pub fn get_pitch_class(&self) -> PitchClass {
         self.pitch_class
     }
 }

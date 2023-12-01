@@ -1,31 +1,115 @@
-pub const THREE_JUST: f32 = 701.95500;
-pub const FIVE_JUST: f32 = 386.3137;
-pub const SEVEN_JUST: f32 = 968.82590;
+// A pitch class is a f32 representing the number of cents mod 1200.
 
-pub const THREE_12TET: f32 = 700.0;
-pub const FIVE_12TET: f32 = 400.0;
-pub const SEVEN_12TET: f32 = 1000.0;
+use std::ops::{Add, Neg, Sub};
 
-pub static MIN_THREE: f32 = THREE_JUST - TUNING_RANGE_OFFSET;
-pub static MAX_THREE: f32 = THREE_JUST + TUNING_RANGE_OFFSET;
-pub static MIN_FIVE: f32 = FIVE_JUST - TUNING_RANGE_OFFSET;
-pub static MAX_FIVE: f32 = FIVE_JUST + TUNING_RANGE_OFFSET;
-pub static MIN_SEVEN: f32 = SEVEN_JUST - TUNING_RANGE_OFFSET;
-pub static MAX_SEVEN: f32 = SEVEN_JUST + TUNING_RANGE_OFFSET;
+use hash32_derive::Hash32;
 
-pub const TUNING_RANGE_OFFSET: f32 = 40.0;
+// Just tunings for primes 3, 5, and 7
+pub const THREE_JUST_F32: f32 = 701.955001;
+pub const FIVE_JUST_F32: f32 = 386.313714;
+pub const SEVEN_JUST_F32: f32 = 968.825906;
 
-// Two cent values are considered equal if their difference is less than this
-pub const CENTS_EPSILON: f32 = 0.001;
+// 12TET approximations for primes 3, 5, and 7
+pub const THREE_12TET_F32: f32 = 700.0;
+pub const FIVE_12TET_F32: f32 = 400.0;
+pub const SEVEN_12TET_F32: f32 = 1000.0;
 
-/// Pitch classes are considered equal if they are within 1/1000 of a cent.
-/// Some tolerance above f32 epsilon is nice to ensure that we ignore drift from
-/// multiplying a generator interval.
-pub fn pitch_classes_equal(a: f32, b: f32) -> bool {
-    (a - b).abs() <= CENTS_EPSILON
+pub const THREE_JUST: PitchClass = PitchClass::from_microcents(701_955_001);
+pub const FIVE_JUST: PitchClass = PitchClass::from_microcents(386_313_714);
+pub const SEVEN_JUST: PitchClass = PitchClass::from_microcents(968_825_906);
+
+pub const CENTS_TO_MICROCENTS: u32 = 1_000_000;
+const MIDI_NOTE_TO_CENTS: u32 = 100;
+const OCTAVE_MICROCENTS: u32 = 1_200 * CENTS_TO_MICROCENTS;
+
+const MIDI_NOTE_TO_CENTS_F32: f32 = MIDI_NOTE_TO_CENTS as f32;
+const CENTS_TO_MICROCENTS_F32: f32 = CENTS_TO_MICROCENTS as f32;
+
+/// Representation of pitch classes as an integer number of microcents.
+/// Avoids the complexity of floating point number comparison, ordering, precision, etc.
+#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Hash32, Debug)]
+pub struct PitchClass(u32);
+
+impl PitchClass {
+    const fn from_microcents(microcents: u32) -> Self {
+        PitchClass(microcents % OCTAVE_MICROCENTS)
+    }
+
+    pub fn distance_to(self, other: PitchClass) -> PitchClassDistance {
+        PitchClassDistance(std::cmp::min((self - other).0, (other - self).0))
+    }
+
+    pub fn from_midi_note(note: u8) -> Self {
+        PitchClass(u32::from(note % 12) * MIDI_NOTE_TO_CENTS * CENTS_TO_MICROCENTS)
+    }
+
+    pub fn from_cents_f32(cents: f32) -> Self {
+        PitchClass((cents.rem_euclid(1200.0) * CENTS_TO_MICROCENTS_F32).round() as u32)
+    }
+
+    pub fn to_cents_f32(self) -> f32 {
+        self.0 as f32 / CENTS_TO_MICROCENTS_F32
+    }
+
+    pub fn with_midi_tuning_offset(self, offset: f32) -> Self {
+        Self::from_microcents(
+            self.0
+                + ((offset.rem_euclid(12.0) * (MIDI_NOTE_TO_CENTS_F32) * (CENTS_TO_MICROCENTS_F32))
+                    .round()) as u32,
+        )
+    }
+
+    fn multiply(self, rhs: i32) -> PitchClass {
+        if rhs >= 0 {
+            PitchClass(((rhs as u64 * u64::from(self.0)) % u64::from(OCTAVE_MICROCENTS)) as u32)
+        } else {
+            PitchClass(((-rhs as u64 * u64::from((-self).0)) % u64::from(OCTAVE_MICROCENTS)) as u32)
+        }
+    }
 }
 
-/// Representation of a pitch class, in terms of how many factors of 3, 5, and 7 it has
+impl Add<PitchClass> for PitchClass {
+    type Output = PitchClass;
+    fn add(self, rhs: PitchClass) -> PitchClass {
+        PitchClass((self.0 + rhs.0) % OCTAVE_MICROCENTS)
+    }
+}
+
+impl Neg for PitchClass {
+    type Output = Self;
+    fn neg(self) -> PitchClass {
+        PitchClass(OCTAVE_MICROCENTS - self.0)
+    }
+}
+
+impl Sub<PitchClass> for PitchClass {
+    type Output = Self;
+    fn sub(self, other: PitchClass) -> PitchClass {
+        self + -other
+    }
+}
+
+#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Hash32, Debug)]
+pub struct PitchClassDistance(u32);
+
+/// Represents a distance between pitch classes - a most half an octave.
+/// Range of [0, 600] cents.
+impl PitchClassDistance {
+    pub const fn from_microcents(microcents: u32) -> PitchClassDistance {
+        // Can't use cmp or min if we want this to be a const fn
+        let flipped_microcents = OCTAVE_MICROCENTS - microcents;
+        PitchClassDistance(if microcents < flipped_microcents {
+            microcents
+        } else {
+            flipped_microcents
+        })
+    }
+    pub const fn from_cents(cents: u32) -> PitchClassDistance {
+        Self::from_microcents(cents * CENTS_TO_MICROCENTS)
+    }
+}
+
+/// Represents an abstract pitch class as its number of prime factors of 3, 5 and 7
 /// C = (0, 0, 0)
 pub struct PrimeCountVector {
     pub threes: i32,
@@ -34,20 +118,6 @@ pub struct PrimeCountVector {
 }
 
 impl PrimeCountVector {
-    // Cents value of a pitch class, given tunings for 3, 5 and 7
-    pub fn cents(&self, three_cents: f32, five_cents: f32, seven_cents: f32) -> f32 {
-        // Convert to f64 to avoid loss of precision from multiplying f32 by large numbers
-        // Might not matter, but this makes me feel safer
-        (self.threes as f64 * three_cents as f64
-            + self.fives as f64 * five_cents as f64
-            + self.sevens as f64 * seven_cents as f64)
-            .rem_euclid(1200.0)
-            .abs() as f32
-    }
-}
-
-static NOTE_NAMES: [char; 7] = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
-impl PrimeCountVector {
     pub fn new(threes: i32, fives: i32, sevens: i32) -> PrimeCountVector {
         PrimeCountVector {
             threes,
@@ -55,7 +125,16 @@ impl PrimeCountVector {
             sevens,
         }
     }
+
+    // Cents value of a pitch class, given tunings for 3, 5 and 7
+    pub fn pitch_class(&self, three_cents: f32, five_cents: f32, seven_cents: f32) -> PitchClass {
+        PitchClass::from_cents_f32(three_cents).multiply(self.threes)
+            + PitchClass::from_cents_f32(five_cents).multiply(self.fives)
+            + PitchClass::from_cents_f32(seven_cents).multiply(self.sevens)
+    }
+
     pub fn note_name_info(&self) -> NoteNameInfo {
+        static NOTE_NAMES: [char; 7] = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
         let letter_names_idx = 1 + self.threes + self.fives * 4 + self.sevens * 10;
         NoteNameInfo {
             letter_name: NOTE_NAMES[letter_names_idx.rem_euclid(7) as usize],
@@ -66,7 +145,7 @@ impl PrimeCountVector {
     }
 }
 
-/// Contains information for naming a note
+/// Contains information for computing a note's display name
 pub struct NoteNameInfo {
     /// Letter name - F, C, G, D, A, E, or B
     pub letter_name: char,
@@ -129,4 +208,63 @@ fn comma_str(comma_count: i32, pos_char: char, neg_char: char) -> String {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_distance() {
+        // Basic case
+        assert_eq!(
+            PitchClass::from_midi_note(1).distance_to(PitchClass::from_midi_note(10)),
+            PitchClassDistance::from_cents(900)
+        );
+
+        // Commutative
+        assert_eq!(
+            PitchClass::from_midi_note(1).distance_to(PitchClass::from_midi_note(10)),
+            PitchClass::from_midi_note(10).distance_to(PitchClass::from_midi_note(1))
+        );
+        // Returns smallest possible distance
+        assert_eq!(
+            PitchClass::from_microcents(100_000_000)
+                .distance_to(PitchClass::from_microcents(900_000_000)),
+            PitchClassDistance::from_microcents(400_000_000)
+        );
+    }
+
+    #[test]
+    fn test_multiply() {
+        // Basic case
+        assert_eq!(
+            PitchClass::from_microcents(100_000_000).multiply(9),
+            PitchClass::from_microcents(900_000_000)
+        );
+
+        // Wraps around
+        assert_eq!(
+            PitchClass::from_microcents(700_000_000).multiply(4),
+            PitchClass::from_microcents(400_000_000)
+        );
+
+        // Wraps around (negative)
+        assert_eq!(
+            PitchClass::from_microcents(700_000_000).multiply(-3),
+            PitchClass::from_microcents(300_000_000)
+        );
+
+        // Large multiplications are OK
+        assert_eq!(
+            PitchClass::from_microcents(1_199_999_999).multiply(1_000_000_000),
+            PitchClass::from_microcents(200_000_000)
+        );
+
+        // Large negative multiplications are OK
+        assert_eq!(
+            PitchClass::from_microcents(1_199_999_999).multiply(-1_000_000_000),
+            PitchClass::from_microcents(1_000_000_000)
+        );
+    }
 }

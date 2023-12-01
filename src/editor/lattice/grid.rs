@@ -3,10 +3,9 @@ use crate::Voices;
 
 use crate::assets;
 use crate::midi::Voice;
-use crate::tuning::pitch_classes_equal;
 use crate::tuning::NoteNameInfo;
+use crate::tuning::PitchClass;
 use crate::tuning::PrimeCountVector;
-use crate::tuning::CENTS_EPSILON;
 use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
@@ -137,7 +136,8 @@ impl View for Grid {
                 );
 
                 // Pitch class represented by this node
-                let pitch_class = primes.cents(three, five, seven);
+                let pitch_class: PitchClass = primes.pitch_class(three, five, seven);
+
                 // Display info for pitch class
                 let note_name_info: NoteNameInfo = primes.note_name_info();
 
@@ -198,28 +198,37 @@ impl View for Grid {
                     &text_paint,
                 );
 
-                // Syntonic commas
-                let _ = canvas.fill_text(
-                    draw_x + NODE_SIZE * 0.48 * scale,
-                    draw_y + NODE_SIZE * 0.59 * scale,
-                    note_name_info.syntonic_comma_str(),
-                    &text_paint,
-                );
+                // Syntonic commas - only displayed if four perfect fifths don't make a third
+                if ((self.params.tuning_params.three.value() * 4.0).rem_euclid(1200.0)
+                    - self.params.tuning_params.five.value())
+                .abs()
+                    > 0.001
+                {
+                    let _ = canvas.fill_text(
+                        draw_x + NODE_SIZE * 0.48 * scale,
+                        draw_y + NODE_SIZE * 0.59 * scale,
+                        note_name_info.syntonic_comma_str(),
+                        &text_paint,
+                    );
+                }
 
                 // Tuning in cents
                 text_paint.set_font_size(NODE_SIZE * 0.26 * scale);
                 text_paint.set_text_align(vg::Align::Center);
                 font_info.font_id.map(|f| text_paint.set_font(&[f]));
-                // Adjust pitch class value to make 1199.999 display as 0 instead of 1200.00
-                let rounded_pitch_class = if pitch_class >= 1199.995 {
-                    0.0
-                } else {
-                    pitch_class
-                };
+                let cents_f32 = pitch_class.to_cents_f32();
                 let _ = canvas.fill_text(
                     draw_x + NODE_SIZE * 0.5 * scale,
                     draw_y + NODE_SIZE * 0.88 * scale,
-                    format!("{:.2}", rounded_pitch_class),
+                    format!(
+                        "{:.2}",
+                        // Adjust pitch class value to make 1199.999 display as 0 instead of 1200.00
+                        if cents_f32 >= 1199.995 {
+                            0.0
+                        } else {
+                            cents_f32
+                        }
+                    ),
                     &text_paint,
                 );
             }
@@ -234,26 +243,21 @@ impl View for Grid {
 }
 // Helper methods for drawing
 impl Grid {
-    /// Retrieves the list of voices from the triple buffer, and returns a sorted vector of them
+    /// Retrieves the list of voices from the triple buffer, and returns a vector of them
+    /// sorted by pitch class.
     fn get_sorted_voices(&self) -> Vec<Voice> {
         let mut voices_output = self.voices_output.lock().unwrap();
         let mut sorted_voices: Vec<Voice> = voices_output.read().values().cloned().collect();
-        sorted_voices.sort_unstable_by(|v1, v2| {
-            v1.get_pitch_class()
-                .partial_cmp(&v2.get_pitch_class())
-                .unwrap()
-        });
+        sorted_voices.sort_unstable_by(|v1, v2| v1.get_pitch_class().cmp(&v2.get_pitch_class()));
         sorted_voices
     }
 }
 
-/// Given a pitch class an a vector of voices sorted by their pitch class, returns a
-/// vector of voices (almost) equal to that pitch class.
-fn get_matching_voices(pitch_class: f32, sorted_voices: &Vec<Voice>) -> Vec<Voice> {
+/// Returns the subset of a vector of voices with a given pitch class.
+fn get_matching_voices(pitch_class: PitchClass, sorted_voices: &Vec<Voice>) -> Vec<Voice> {
     let mut matching_voices: Vec<Voice> = Vec::new();
     // Start at the first voice whose pitch class is greater than or equal to the node's
-    let start_idx =
-        sorted_voices.partition_point(|v| v.get_pitch_class() < pitch_class - CENTS_EPSILON);
+    let start_idx = sorted_voices.partition_point(|v| v.get_pitch_class() < pitch_class);
     if start_idx == sorted_voices.len() {
         return matching_voices;
     }
@@ -261,7 +265,7 @@ fn get_matching_voices(pitch_class: f32, sorted_voices: &Vec<Voice>) -> Vec<Voic
     // Iterate circularly through the list of sorted voices
     // until the current voice doesn't match,
     // or we've made it back to the starting point
-    while pitch_classes_equal(sorted_voices[idx].get_pitch_class(), pitch_class) {
+    while sorted_voices[idx].get_pitch_class() == pitch_class {
         matching_voices.push(sorted_voices[idx]);
         if idx == sorted_voices.len() - 1 {
             idx = 0;

@@ -2,7 +2,7 @@ use crate::editor::lattice::grid::NODE_SIZE;
 use crate::editor::lattice::LatticeEvent;
 use crate::editor::*;
 use crate::GridParams;
-use crate::GRID_MAX_DISTANCE;
+use crate::MAX_GRID_OFFSET;
 
 use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::vg;
@@ -48,7 +48,7 @@ impl DragRegion {
 }
 
 fn normalize_grid_position(pos: f32) -> f32 {
-    (pos + GRID_MAX_DISTANCE) / (GRID_MAX_DISTANCE * 2.0)
+    (pos + MAX_GRID_OFFSET) / (MAX_GRID_OFFSET * 2.0)
 }
 
 impl View for DragRegion {
