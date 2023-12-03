@@ -70,6 +70,16 @@ impl View for DragRegion {
             _ => {}
         });
         event.map(|window_event, _meta| match *window_event {
+            /*WindowEvent::MouseDoubleClick(MouseButton::Left) => {
+                // Set coordinates to (0,0)
+                cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.x).upcast());
+                cx.emit(ParamEvent::SetParameter(&self.grid_params.x, 0.0).upcast());
+                cx.emit(ParamEvent::EndSetParameter(&self.grid_params.x).upcast());
+
+                cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.y).upcast());
+                cx.emit(ParamEvent::SetParameter(&self.grid_params.y, 0.0).upcast());
+                cx.emit(ParamEvent::EndSetParameter(&self.grid_params.y).upcast());
+            }*/
             WindowEvent::MouseDown(MouseButton::Left) => {
                 cx.capture();
                 // cx.set_active(true);
@@ -124,10 +134,10 @@ impl View for DragRegion {
                 if self.drag_active {
                     // Move the grid according to how far the mouse moved from the start drag location
                     let grid_x_offset = (mouse_x - start_physical_coordinates_x)
-                        / (cx.scale_factor() * (NODE_SIZE + CONTAINER_PADDING));
+                        / (cx.scale_factor() * (NODE_SIZE + PADDING));
 
                     let grid_y_offset = (mouse_y - start_physical_coordinates_y)
-                        / (cx.scale_factor() * (NODE_SIZE + CONTAINER_PADDING));
+                        / (cx.scale_factor() * (NODE_SIZE + PADDING));
 
                     cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.x).upcast());
                     cx.emit(
@@ -153,8 +163,8 @@ impl View for DragRegion {
 
         if cx.visibility() == Some(Visibility::Visible) {
             // Draw "draggable" icon in center
-            let icon_radius: f32 = NODE_SIZE * 1.4 * cx.scale_factor();
-            let arrow_size: f32 = NODE_SIZE * 0.4 * cx.scale_factor();
+            let icon_radius: f32 = NODE_SIZE * 1.4 * cx.scale_factor() as f32;
+            let arrow_size: f32 = NODE_SIZE * 0.4 * cx.scale_factor() as f32;
             let (center_x, center_y) = (bounds.x + bounds.w * 0.5, bounds.y + bounds.h * 0.5);
             let (left_x, top_y, right_x, bottom_y) = (
                 center_x - icon_radius,
@@ -206,7 +216,7 @@ impl View for DragRegion {
 
             canvas.stroke_path(
                 &mut icon_path,
-                &make_icon_paint(color, CONTAINER_PADDING * 3.0 * cx.scale_factor()),
+                &make_icon_paint(color, PADDING * 3.0 * cx.scale_factor() as f32),
             );
         }
     }

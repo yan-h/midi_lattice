@@ -52,11 +52,16 @@ impl Voice {
 
     fn set_tuning(&mut self, tuning_offset: f32) {
         self.pitch = (self.note as f32) + tuning_offset;
-        self.pitch_class = self.pitch_class.with_midi_tuning_offset(tuning_offset);
+        self.pitch_class = PitchClass::from_midi_note(self.note)
+            + PitchClass::from_midi_note_offset_f32(tuning_offset);
     }
 
     pub fn get_pitch_class(&self) -> PitchClass {
         self.pitch_class
+    }
+
+    pub fn get_channel(&self) -> u8 {
+        self.channel
     }
 }
 
@@ -64,8 +69,8 @@ impl Display for Voice {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{{ note {}, ch {}, pitch {} }}",
-            self.note, self.channel, self.pitch
+            "{{ note {}, ch {}, pitch {:.9}, pitch class {} }}",
+            self.note, self.channel, self.pitch, self.pitch_class
         )
     }
 }
@@ -113,7 +118,7 @@ impl Display for DisplayNoteEvent {
                 tuning,
             }) => write!(
                 f,
-                "{{ tune: note {}, ch {}, id {:?}, tun {} }}",
+                "{{ tune: note {}, ch {}, id {:?}, tun {:.9} }}",
                 note, channel, voice_id, tuning
             ),
             DisplayNoteEvent(note_event) => {

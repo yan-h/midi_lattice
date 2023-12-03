@@ -1,8 +1,11 @@
 // A pitch class is a f32 representing the number of cents mod 1200.
 
-use std::ops::{Add, Neg, Sub};
+use std::{
+    fmt::{self, Display},
+    ops::{Add, Neg, Sub},
+};
 
-use hash32_derive::Hash32;
+use nih_plug::nih_dbg;
 
 // Just tunings for primes 3, 5, and 7
 pub const THREE_JUST_F32: f32 = 701.955001;
@@ -27,11 +30,17 @@ const CENTS_TO_MICROCENTS_F32: f32 = CENTS_TO_MICROCENTS as f32;
 
 /// Representation of pitch classes as an integer number of microcents.
 /// Avoids the complexity of floating point number comparison, ordering, precision, etc.
-#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Hash32, Debug)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Debug)]
 pub struct PitchClass(u32);
 
+impl Display for PitchClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.6}", self.to_cents_f32())
+    }
+}
+
 impl PitchClass {
-    const fn from_microcents(microcents: u32) -> Self {
+    pub const fn from_microcents(microcents: u32) -> Self {
         PitchClass(microcents % OCTAVE_MICROCENTS)
     }
 
@@ -47,15 +56,31 @@ impl PitchClass {
         PitchClass((cents.rem_euclid(1200.0) * CENTS_TO_MICROCENTS_F32).round() as u32)
     }
 
+    pub fn from_midi_note_offset_f32(midi_note_offset_f32: f32) -> Self {
+        PitchClass(
+            (midi_note_offset_f32.rem_euclid(12.0)
+                * MIDI_NOTE_TO_CENTS_F32
+                * CENTS_TO_MICROCENTS_F32)
+                .round() as u32,
+        )
+    }
+
     pub fn to_cents_f32(self) -> f32 {
         self.0 as f32 / CENTS_TO_MICROCENTS_F32
     }
 
     pub fn with_midi_tuning_offset(self, offset: f32) -> Self {
-        Self::from_microcents(
+        nih_dbg!(offset);
+        nih_dbg!(
             self.0
-                + ((offset.rem_euclid(12.0) * (MIDI_NOTE_TO_CENTS_F32) * (CENTS_TO_MICROCENTS_F32))
-                    .round()) as u32,
+                + ((offset.rem_euclid(12.0) * MIDI_NOTE_TO_CENTS_F32 * CENTS_TO_MICROCENTS_F32)
+                    .round()) as u32
+        );
+        PitchClass(
+            (self.0
+                + ((offset.rem_euclid(12.0) * MIDI_NOTE_TO_CENTS_F32 * CENTS_TO_MICROCENTS_F32)
+                    .round()) as u32)
+                % OCTAVE_MICROCENTS,
         )
     }
 
@@ -89,7 +114,7 @@ impl Sub<PitchClass> for PitchClass {
     }
 }
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Hash32, Debug)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Debug)]
 pub struct PitchClassDistance(u32);
 
 /// Represents a distance between pitch classes - a most half an octave.
@@ -106,6 +131,12 @@ impl PitchClassDistance {
     }
     pub const fn from_cents(cents: u32) -> PitchClassDistance {
         Self::from_microcents(cents * CENTS_TO_MICROCENTS)
+    }
+}
+
+impl Display for PitchClassDistance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "dist {}", self.0)
     }
 }
 

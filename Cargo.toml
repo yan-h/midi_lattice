@@ -28,6 +28,8 @@ heapless = "0.7.16"
 triple_buffer = "7.0.0"
 hash32 = "0.2.1"
 hash32-derive = "0.1.1"
+color_space = "0.5.3"
+once_cell = "1.18.0"
 
 [profile.release]
 lto = "thin"

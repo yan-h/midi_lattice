@@ -10,10 +10,10 @@ use crate::{TuningParams, Voices};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use crate::editor::{
-    intersects_box, make_icon_stroke_paint, COLOR_0, COLOR_1, COLOR_2, COLOR_3,
-    CONTAINER_CORNER_RADIUS,
+    intersects_box, make_icon_stroke_paint, COLOR_0, COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS,
 };
 
 pub struct TuningLearnButton {
@@ -84,15 +84,21 @@ impl View for TuningLearnButton {
             bounds.y,
             bounds.w,
             bounds.h,
-            crate::editor::CONTAINER_CORNER_RADIUS * scale,
+            crate::editor::CORNER_RADIUS * scale,
         );
         container_path.close();
 
-        let paint = vg::Paint::color(if highlighted { COLOR_2 } else { COLOR_1 });
+        let paint = vg::Paint::color(if self.learn_active {
+            COLOR_3
+        } else if highlighted {
+            COLOR_2
+        } else {
+            COLOR_1
+        });
         canvas.fill_path(&mut container_path, &paint);
 
-        let icon_line_width: f32 = CONTAINER_CORNER_RADIUS * scale;
-        let icon_padding: f32 = CONTAINER_CORNER_RADIUS * scale + icon_line_width * 0.5;
+        let icon_line_width: f32 = CORNER_RADIUS * scale;
+        let icon_padding: f32 = CORNER_RADIUS * scale + icon_line_width * 0.5;
 
         // Draw "+" or "-"
         let mut icon_path = vg::Path::new();
@@ -121,6 +127,8 @@ impl TuningLearnButton {
     /// Only considers approximations within [`LEARN_RANGE`] cents of the true interval.
     fn learn_tuning(&self, cx: &mut EventContext) {
         let mut voices_output = self.voices_output.lock().unwrap();
+
+        nih_dbg!(&voices_output.read());
         let mut pitch_classes: Vec<PitchClass> = voices_output
             .read()
             .values()
@@ -160,14 +168,8 @@ impl TuningLearnButton {
                 // This is true because this plugin assumes perfectly tuned octaves.
                 let interval: PitchClass = *pc_a - *pc_b;
                 let flipped_interval: PitchClass = -interval;
-                /*
-                nih_log!(
-                    "{} {} | {} {}",
-                    voice_a.get_pitch_class(),
-                    voice_b.get_pitch_class(),
-                    interval,
-                    flipped_interval
-                );*/
+
+                //nih_log!("{} {}", interval, flipped_interval);
                 update_best_tuning(&mut best_three, interval, THREE_JUST);
                 update_best_tuning(&mut best_five, interval, FIVE_JUST);
                 update_best_tuning(&mut best_seven, interval, SEVEN_JUST);

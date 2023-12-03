@@ -21,16 +21,18 @@ use nih_plug_vizia::{create_vizia_editor, ViziaTheming};
 use std::sync::{Arc, Mutex};
 use triple_buffer::Output;
 
+use self::lattice::grid::NODE_SIZE;
+
 mod lattice;
 mod resizer;
 mod scale_button;
 mod tuning_learn_button;
 
-pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.75 + CONTAINER_PADDING * 2.0;
-pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.75 + CONTAINER_PADDING * 2.0;
+pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
+pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
 
-pub const CONTAINER_PADDING: f32 = grid::NODE_SIZE * 0.09;
-pub const CONTAINER_CORNER_RADIUS: f32 = CONTAINER_PADDING;
+pub const PADDING: f32 = grid::NODE_SIZE * 0.1;
+pub const CORNER_RADIUS: f32 = PADDING;
 
 #[derive(Lens, Clone)]
 pub struct Data {
@@ -54,8 +56,8 @@ pub const MIN_GRID_HEIGHT: u8 = 4;
 pub const MAX_GRID_WIDTH: u8 = 12;
 pub const MAX_GRID_HEIGHT: u8 = 12;
 
-pub const NON_GRID_HEIGHT: f32 = BOTTOM_REGION_HEIGHT + CONTAINER_PADDING * 2.0;
-pub const NON_GRID_WIDTH: f32 = RIGHT_REGION_WIDTH + CONTAINER_PADDING * 2.0;
+pub const NON_GRID_HEIGHT: f32 = BOTTOM_REGION_HEIGHT + PADDING;
+pub const NON_GRID_WIDTH: f32 = RIGHT_REGION_WIDTH + PADDING;
 
 // Darkest color
 pub static COLOR_0: vg::Color = vg::Color::rgbf(
@@ -65,15 +67,15 @@ pub static COLOR_0: vg::Color = vg::Color::rgbf(
 );
 
 pub static COLOR_1: vg::Color = vg::Color::rgbf(
-    0x54 as f32 / 255.0,
-    0x54 as f32 / 255.0,
-    0x54 as f32 / 255.0,
+    0x60 as f32 / 255.0,
+    0x60 as f32 / 255.0,
+    0x60 as f32 / 255.0,
 );
 
 pub static COLOR_2: vg::Color = vg::Color::rgbf(
-    0x7A as f32 / 255.0,
-    0x7A as f32 / 255.0,
-    0x7A as f32 / 255.0,
+    0x8A as f32 / 255.0,
+    0x8A as f32 / 255.0,
+    0x8A as f32 / 255.0,
 );
 
 // Brightest color
@@ -99,7 +101,7 @@ pub fn make_icon_paint(color: vg::Color, width: f32) -> Paint {
 }
 
 pub fn make_icon_stroke_paint(color: vg::Color, scale: f32) -> Paint {
-    make_icon_paint(color, CONTAINER_CORNER_RADIUS * scale)
+    make_icon_paint(color, CORNER_RADIUS * scale)
 }
 
 pub fn width_to_grid_width(width: f32) -> u8 {
@@ -107,9 +109,17 @@ pub fn width_to_grid_width(width: f32) -> u8 {
         MAX_GRID_WIDTH,
         max(
             MIN_GRID_WIDTH,
-            ((width - NON_GRID_WIDTH) / (grid::NODE_SIZE + grid::NODE_GAP)) as u8,
+            ((width - NON_GRID_WIDTH - PADDING) / (grid::NODE_SIZE + PADDING)) as u8,
         ),
     )
+}
+
+pub fn lattice_width_pixels(grid_width: u8) -> f32 {
+    grid_width as f32 * NODE_SIZE + (grid_width as f32 + 1.0) * PADDING
+}
+
+pub fn lattice_height_pixels(grid_height: u8) -> f32 {
+    grid_height as f32 * NODE_SIZE + (grid_height as f32 + 1.0) * PADDING
 }
 
 pub fn height_to_grid_height(height: f32) -> u8 {
@@ -117,19 +127,21 @@ pub fn height_to_grid_height(height: f32) -> u8 {
         MAX_GRID_HEIGHT,
         max(
             MIN_GRID_HEIGHT,
-            ((height - NON_GRID_HEIGHT) / (grid::NODE_SIZE + grid::NODE_GAP)) as u8,
+            ((height - NON_GRID_HEIGHT - PADDING) / (grid::NODE_SIZE + PADDING)) as u8,
         ),
     )
 }
 
 pub fn vizia_state(grid_params: Arc<GridParams>) -> Arc<ViziaState> {
     ViziaState::new(move || {
-        let width: u32 = ((grid::NODE_SIZE + grid::NODE_GAP)
+        let width: u32 = ((grid::NODE_SIZE + PADDING)
             * (grid_params.width.load(Ordering::Relaxed) as f32)
-            + NON_GRID_WIDTH) as u32;
-        let height: u32 = ((grid::NODE_SIZE + grid::NODE_GAP)
+            + NON_GRID_WIDTH
+            + PADDING) as u32;
+        let height: u32 = ((grid::NODE_SIZE + PADDING)
             * (grid_params.height.load(Ordering::Relaxed) as f32)
-            + NON_GRID_HEIGHT) as u32;
+            + NON_GRID_HEIGHT
+            + PADDING) as u32;
         (width, height)
     })
 }
@@ -146,13 +158,13 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
 
             data.clone().build(cx);
 
-            let timer = cx.add_timer(Duration::from_millis(100), None, |cx, _| {
-                nih_log!("tick asdf");
-            });
-            cx.start_timer(timer);
+            let (lattice_width_pixels, lattice_height_pixels) = (
+                lattice_width_pixels(data.params.grid_params.width.load(Ordering::Relaxed)),
+                lattice_height_pixels(data.params.grid_params.height.load(Ordering::Relaxed)),
+            );
 
             HStack::new(cx, |cx| {
-                let button_dimensions = BOTTOM_REGION_HEIGHT - CONTAINER_PADDING * 2.0;
+                let button_dimensions = BOTTOM_REGION_HEIGHT - PADDING * 2.0;
 
                 TuningLearnButton::new(
                     cx,
@@ -166,30 +178,26 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
             })
             .position_type(PositionType::SelfDirected)
             .top(Units::Stretch(1.0))
-            .bottom(Units::Pixels(CONTAINER_PADDING))
-            .left(Units::Pixels(CONTAINER_PADDING))
-            .right(Units::Pixels(CONTAINER_PADDING))
-            .height(Units::Pixels(
-                BOTTOM_REGION_HEIGHT - 2.0 * CONTAINER_PADDING,
-            ));
+            .bottom(Units::Pixels(PADDING))
+            .left(Units::Pixels(PADDING))
+            .right(Units::Pixels(PADDING))
+            .height(Units::Pixels(BOTTOM_REGION_HEIGHT - 2.0 * PADDING));
 
             Lattice::new(cx, Data::params, Data::voices_output)
                 .position_type(PositionType::SelfDirected)
                 .bottom(Units::Pixels(BOTTOM_REGION_HEIGHT))
-                .left(Units::Pixels(CONTAINER_PADDING))
-                .top(Units::Pixels(CONTAINER_PADDING))
+                .left(Units::Pixels(PADDING))
+                .top(Units::Pixels(PADDING))
                 .right(Units::Pixels(RIGHT_REGION_WIDTH));
 
             Resizer::new(cx)
                 .position_type(PositionType::SelfDirected)
-                .right(Units::Pixels(CONTAINER_PADDING))
-                .bottom(Units::Pixels(CONTAINER_PADDING))
+                .right(Units::Pixels(PADDING))
+                .bottom(Units::Pixels(PADDING))
                 .top(Units::Stretch(1.0))
                 .left(Units::Stretch(1.0))
-                .width(Units::Pixels(RIGHT_REGION_WIDTH - CONTAINER_PADDING * 2.0))
-                .height(Units::Pixels(
-                    BOTTOM_REGION_HEIGHT - CONTAINER_PADDING * 2.0,
-                ));
+                .width(Units::Pixels(RIGHT_REGION_WIDTH - PADDING * 2.0))
+                .height(Units::Pixels(BOTTOM_REGION_HEIGHT - PADDING * 2.0));
         },
     )
 }

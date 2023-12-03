@@ -1,8 +1,6 @@
 //! A resize handle for uniformly scaling a plugin GUI.
 
-use crate::editor::{
-    intersects_box, COLOR_1, COLOR_2, COLOR_3, CONTAINER_CORNER_RADIUS, CONTAINER_PADDING,
-};
+use crate::editor::{intersects_box, COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS, PADDING};
 use nih_plug::nih_dbg;
 use nih_plug::prelude::nih_log;
 use nih_plug_vizia::vizia::prelude::*;
@@ -111,16 +109,22 @@ impl View for Resizer {
             bounds.y,
             bounds.w,
             bounds.h,
-            CONTAINER_CORNER_RADIUS * scale,
+            CORNER_RADIUS * scale,
         );
         container_path.close();
 
         // Fill with background color
-        let paint = vg::Paint::color(if highlighted { COLOR_2 } else { COLOR_1 });
+        let paint = vg::Paint::color(if self.drag_active {
+            COLOR_3
+        } else if highlighted {
+            COLOR_2
+        } else {
+            COLOR_1
+        });
         canvas.fill_path(&mut container_path, &paint);
 
-        let icon_line_width: f32 = CONTAINER_CORNER_RADIUS * scale;
-        let icon_padding: f32 = CONTAINER_CORNER_RADIUS * scale + icon_line_width * 0.5;
+        let icon_line_width: f32 = CORNER_RADIUS * scale;
+        let icon_padding: f32 = CORNER_RADIUS * scale + icon_line_width * 0.5;
         let color = COLOR_0;
         let icon_paint = make_icon_stroke_paint(color, scale);
         let mut icon_path = vg::Path::new();

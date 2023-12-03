@@ -7,7 +7,7 @@ use nih_plug_vizia::vizia::vg;
 use std::sync::{Arc, Mutex};
 use triple_buffer::Output;
 
-use crate::editor::{COLOR_1, COLOR_2, COLOR_3, CONTAINER_CORNER_RADIUS, CONTAINER_PADDING};
+use crate::editor::{COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS, PADDING};
 
 use self::drag_region::DragRegion;
 use self::grid::Grid;
@@ -34,7 +34,7 @@ impl Lattice {
         voices_output: LVoices,
     ) -> Handle<Self>
     where
-        LParams: Lens<Target = Arc<MidiLatticeParams>>,
+        LParams: Lens<Target = Arc<MidiLatticeParams>> + Copy,
         LVoices: Lens<Target = Arc<Mutex<Output<Voices>>>>,
     {
         Self {
@@ -50,11 +50,10 @@ impl Lattice {
             |cx| {
                 Grid::new(cx, params, voices_output)
                     .position_type(PositionType::SelfDirected)
-                    .bottom(Units::Pixels(CONTAINER_PADDING))
-                    .left(Units::Pixels(CONTAINER_PADDING))
-                    .top(Units::Pixels(CONTAINER_PADDING))
-                    .right(Units::Pixels(CONTAINER_PADDING))
-                    .overflow(Overflow::Hidden);
+                    .bottom(Units::Pixels(PADDING))
+                    .left(Units::Pixels(PADDING))
+                    .top(Units::Pixels(PADDING))
+                    .right(Units::Pixels(PADDING));
 
                 DragRegion::new(cx, params.map(|p| p.grid_params.clone()))
                     .position_type(PositionType::ParentDirected)
@@ -123,11 +122,13 @@ impl View for Lattice {
             // We don't need to do this for MouseDown because the lattice directly receives
             // those events when a child receives one.
             LatticeEvent::MouseUpFromChild => {
-                if !intersects_box(cx.bounds(), (cx.mouse().cursorx, cx.mouse().cursory)) {
+                if self.mouse_over {
                     self.mouse_over = false;
-                    cx.emit_custom(
-                        Event::new(LatticeEvent::MouseOut).propagate(Propagation::Subtree),
-                    );
+                    if !intersects_box(cx.bounds(), (cx.mouse().cursorx, cx.mouse().cursory)) {
+                        cx.emit_custom(
+                            Event::new(LatticeEvent::MouseOut).propagate(Propagation::Subtree),
+                        );
+                    }
                 }
                 cx.emit_custom(
                     Event::new(LatticeEvent::MouseUpToChild).propagate(Propagation::Subtree),
@@ -139,7 +140,7 @@ impl View for Lattice {
 
     fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
         let bounds = cx.bounds();
-        let scale = cx.scale_factor();
+        let scale = cx.scale_factor() as f32;
 
         // Draw background rectangle
         let mut container_path = vg::Path::new();
@@ -148,7 +149,7 @@ impl View for Lattice {
             bounds.y,
             bounds.w,
             bounds.h,
-            CONTAINER_CORNER_RADIUS * scale,
+            CORNER_RADIUS * scale,
         );
         container_path.close();
         canvas.fill_path(&mut container_path, &vg::Paint::color(COLOR_1));

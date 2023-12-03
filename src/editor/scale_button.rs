@@ -60,7 +60,6 @@ impl View for ScaleButton {
         });
 
         nih_dbg!(cx.user_scale_factor());
-        nih_dbg!(cx.scale_factor());
     }
 
     fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
@@ -74,15 +73,15 @@ impl View for ScaleButton {
             bounds.y,
             bounds.w,
             bounds.h,
-            crate::editor::CONTAINER_CORNER_RADIUS * scale,
+            crate::editor::CORNER_RADIUS * scale,
         );
         container_path.close();
 
         let paint = vg::Paint::color(if highlighted { COLOR_2 } else { COLOR_1 });
         canvas.fill_path(&mut container_path, &paint);
 
-        let icon_line_width: f32 = CONTAINER_CORNER_RADIUS * scale;
-        let icon_padding: f32 = CONTAINER_CORNER_RADIUS * scale + icon_line_width * 0.5;
+        let icon_line_width: f32 = CORNER_RADIUS * scale;
+        let icon_padding: f32 = CORNER_RADIUS * scale + icon_line_width * 0.5;
 
         // Draw "+" or "-"
         let mut icon_path = vg::Path::new();
