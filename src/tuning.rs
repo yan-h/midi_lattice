@@ -40,6 +40,34 @@ impl Display for PitchClass {
 }
 
 impl PitchClass {
+    pub const fn to_microcents(&self) -> u32 {
+        self.0
+    }
+
+    pub const fn round(&self, decimal_digits: u32) -> PitchClass {
+        if decimal_digits > 6 {
+            return *self;
+        }
+        let raised: u32 = 10u32.pow(6 - decimal_digits);
+        PitchClass::from_microcents(if self.0 % raised >= raised / 2 {
+            self.0 - self.0 % raised + raised
+        } else {
+            self.0 - self.0 % raised
+        })
+    }
+
+    pub const fn get_decimal_digit_num(&self, num: u32) -> u8 {
+        if num > 5 {
+            return 0;
+        }
+        let raised: u32 = 10u32.pow(6 - num);
+        ((self.to_microcents() % raised) / (raised / 10)) as u8
+    }
+
+    pub const fn trunc_cents(&self) -> u32 {
+        self.0 / CENTS_TO_MICROCENTS
+    }
+
     pub const fn from_microcents(microcents: u32) -> Self {
         PitchClass(microcents % OCTAVE_MICROCENTS)
     }
@@ -84,7 +112,7 @@ impl PitchClass {
         )
     }
 
-    fn multiply(self, rhs: i32) -> PitchClass {
+    pub fn multiply(self, rhs: i32) -> PitchClass {
         if rhs >= 0 {
             PitchClass(((rhs as u64 * u64::from(self.0)) % u64::from(OCTAVE_MICROCENTS)) as u32)
         } else {
@@ -158,15 +186,20 @@ impl PrimeCountVector {
     }
 
     // Cents value of a pitch class, given tunings for 3, 5 and 7
-    pub fn pitch_class(&self, three_cents: f32, five_cents: f32, seven_cents: f32) -> PitchClass {
-        PitchClass::from_cents_f32(three_cents).multiply(self.threes)
-            + PitchClass::from_cents_f32(five_cents).multiply(self.fives)
-            + PitchClass::from_cents_f32(seven_cents).multiply(self.sevens)
+    pub fn pitch_class(
+        &self,
+        three_tuning: PitchClass,
+        five_tuning: PitchClass,
+        seven_tuning: PitchClass,
+    ) -> PitchClass {
+        three_tuning.multiply(self.threes)
+            + five_tuning.multiply(self.fives)
+            + seven_tuning.multiply(self.sevens)
     }
 
     pub fn note_name_info(&self) -> NoteNameInfo {
         static NOTE_NAMES: [char; 7] = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
-        let letter_names_idx = 1 + self.threes + self.fives * 4 + self.sevens * 10;
+        let letter_names_idx = 1 + self.threes + self.fives * 4 - self.sevens * 2;
         NoteNameInfo {
             letter_name: NOTE_NAMES[letter_names_idx.rem_euclid(7) as usize],
             sharps_or_flats: letter_names_idx.div_euclid(7),

@@ -123,8 +123,8 @@ impl View for Resizer {
         });
         canvas.fill_path(&mut container_path, &paint);
 
-        let icon_line_width: f32 = CORNER_RADIUS * scale;
-        let icon_padding: f32 = CORNER_RADIUS * scale + icon_line_width * 0.5;
+        let icon_line_width: f32 = PADDING * scale;
+        let icon_padding: f32 = PADDING * scale + icon_line_width * 0.5;
         let color = COLOR_0;
         let icon_paint = make_icon_stroke_paint(color, scale);
         let mut icon_path = vg::Path::new();

@@ -16,6 +16,8 @@ use crate::editor::{
     intersects_box, make_icon_stroke_paint, COLOR_0, COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS,
 };
 
+use super::PADDING;
+
 pub struct TuningLearnButton {
     learn_active: bool,
     tuning_params: Arc<TuningParams>,
@@ -97,10 +99,10 @@ impl View for TuningLearnButton {
         });
         canvas.fill_path(&mut container_path, &paint);
 
-        let icon_line_width: f32 = CORNER_RADIUS * scale;
-        let icon_padding: f32 = CORNER_RADIUS * scale + icon_line_width * 0.5;
+        let icon_line_width: f32 = PADDING * scale;
+        let icon_padding: f32 = PADDING * scale + icon_line_width * 0.5;
 
-        // Draw "+" or "-"
+        // Draw tuning symbol
         let mut icon_path = vg::Path::new();
         icon_path.move_to(bounds.x + bounds.w * 0.38, bounds.y + icon_padding);
         icon_path.line_to(bounds.x + bounds.w * 0.38, bounds.y + bounds.h * 0.5);

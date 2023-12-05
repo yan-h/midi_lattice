@@ -57,6 +57,9 @@ pub struct GridParams {
     // Y offset of the grid from the origin, C
     #[id = "grid-y"]
     pub y: FloatParam,
+
+    #[id = "grid-z"]
+    pub z: IntParam,
 }
 
 const MAX_GRID_OFFSET: f32 = 20.0;
@@ -80,6 +83,14 @@ impl Default for GridParams {
                 FloatRange::Linear {
                     min: -MAX_GRID_OFFSET,
                     max: MAX_GRID_OFFSET,
+                },
+            ),
+            z: IntParam::new(
+                "Grid Z",
+                0,
+                IntRange::Linear {
+                    min: -MAX_GRID_OFFSET as i32,
+                    max: MAX_GRID_OFFSET as i32,
                 },
             ),
         }

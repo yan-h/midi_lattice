@@ -31,8 +31,8 @@ mod tuning_learn_button;
 pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
 pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
 
-pub const PADDING: f32 = grid::NODE_SIZE * 0.1;
-pub const CORNER_RADIUS: f32 = PADDING;
+pub const PADDING: f32 = grid::NODE_SIZE * 0.08;
+pub const CORNER_RADIUS: f32 = PADDING * 1.6;
 
 #[derive(Lens, Clone)]
 pub struct Data {
@@ -72,6 +72,12 @@ pub static COLOR_1: vg::Color = vg::Color::rgbf(
     0x60 as f32 / 255.0,
 );
 
+pub static COLOR_1_DARKER: vg::Color = vg::Color::rgbf(
+    0x54 as f32 / 255.0,
+    0x54 as f32 / 255.0,
+    0x54 as f32 / 255.0,
+);
+
 pub static COLOR_2: vg::Color = vg::Color::rgbf(
     0x8A as f32 / 255.0,
     0x8A as f32 / 255.0,
@@ -101,7 +107,7 @@ pub fn make_icon_paint(color: vg::Color, width: f32) -> Paint {
 }
 
 pub fn make_icon_stroke_paint(color: vg::Color, scale: f32) -> Paint {
-    make_icon_paint(color, CORNER_RADIUS * scale)
+    make_icon_paint(color, PADDING * scale)
 }
 
 pub fn width_to_grid_width(width: f32) -> u8 {

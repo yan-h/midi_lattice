@@ -70,7 +70,7 @@ impl View for DragRegion {
             _ => {}
         });
         event.map(|window_event, _meta| match *window_event {
-            /*WindowEvent::MouseDoubleClick(MouseButton::Left) => {
+            WindowEvent::MouseDoubleClick(MouseButton::Left) => {
                 // Set coordinates to (0,0)
                 cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.x).upcast());
                 cx.emit(ParamEvent::SetParameter(&self.grid_params.x, 0.0).upcast());
@@ -79,7 +79,11 @@ impl View for DragRegion {
                 cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.y).upcast());
                 cx.emit(ParamEvent::SetParameter(&self.grid_params.y, 0.0).upcast());
                 cx.emit(ParamEvent::EndSetParameter(&self.grid_params.y).upcast());
-            }*/
+
+                cx.emit(ParamEvent::BeginSetParameter(&self.grid_params.z).upcast());
+                cx.emit(ParamEvent::SetParameter(&self.grid_params.z, 0).upcast());
+                cx.emit(ParamEvent::EndSetParameter(&self.grid_params.z).upcast());
+            }
             WindowEvent::MouseDown(MouseButton::Left) => {
                 cx.capture();
                 // cx.set_active(true);
