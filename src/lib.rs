@@ -108,6 +108,9 @@ pub struct TuningParams {
 
     #[id = "tuning-seven"]
     seven: FloatParam,
+
+    #[id = "tuning-tolerance"]
+    tolerance: FloatParam,
 }
 
 // Range for the tuning parameter for each prime harmonic
@@ -117,7 +120,7 @@ impl Default for TuningParams {
     fn default() -> Self {
         Self {
             three: FloatParam::new(
-                "Perfect Fifth",
+                "Perfect Fifth (cents)",
                 THREE_12TET_F32,
                 FloatRange::Linear {
                     min: THREE_JUST_F32 - MAX_TUNING_OFFSET,
@@ -125,7 +128,7 @@ impl Default for TuningParams {
                 },
             ),
             five: FloatParam::new(
-                "Major Third",
+                "Major Third (cents)",
                 FIVE_12TET_F32,
                 FloatRange::Linear {
                     min: FIVE_JUST_F32 - MAX_TUNING_OFFSET,
@@ -133,11 +136,20 @@ impl Default for TuningParams {
                 },
             ),
             seven: FloatParam::new(
-                "Harmonic Seventh",
+                "Harmonic Seventh (cents)",
                 SEVEN_12TET_F32,
                 FloatRange::Linear {
                     min: SEVEN_JUST_F32 - MAX_TUNING_OFFSET,
                     max: SEVEN_JUST_F32 + MAX_TUNING_OFFSET,
+                },
+            ),
+            tolerance: FloatParam::new(
+                "Tuning Tolerance (cents)",
+                0.01,
+                FloatRange::Skewed {
+                    min: 0.001,
+                    max: 49.999,
+                    factor: FloatRange::skew_factor(-2.5),
                 },
             ),
         }
@@ -222,7 +234,7 @@ impl Plugin for MidiLattice {
         while let Some(event) = context.next_event() {
             update_voices(&mut self.voices, event);
 
-            //nih_log!("event: {}", DisplayNoteEvent(event));
+            nih_log!("event: {}", DisplayNoteEvent(event));
             context.send_event(event);
 
             event_counter += 1;
@@ -230,10 +242,10 @@ impl Plugin for MidiLattice {
 
         if event_counter > 0 {
             self.voices_input.write(self.voices.clone());
-
+            /*
             for v in self.voices.values() {
                 nih_log!("--- voice: {}", v);
-            }
+            }*/
             /*
             nih_log!(
                 "*** process() finished in {} us with {} events",

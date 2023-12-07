@@ -24,6 +24,7 @@ use std::str::MatchIndices;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use std::u128::MIN;
 use triple_buffer::Output;
 
 use crate::editor::{COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS, PADDING};
@@ -132,6 +133,7 @@ struct DrawGridArgs {
     scaled_node_size: f32,
     scaled_padding: f32,
     scaled_corner_radius: f32,
+    scaled_inner_corner_radius: f32,
     bounds: BoundingBox,
     grid_width: i32,
     grid_height: i32,
@@ -142,6 +144,7 @@ struct DrawGridArgs {
     three_tuning: PitchClass,
     five_tuning: PitchClass,
     seven_tuning: PitchClass,
+    tuning_tolerance: PitchClassDistance,
     font_id: Option<FontId>,
     mono_font_id: Option<FontId>,
 }
@@ -156,6 +159,7 @@ impl DrawGridArgs {
             scaled_node_size: NODE_SIZE * cx.scale_factor(),
             scaled_padding: PADDING * cx.scale_factor(),
             scaled_corner_radius: CORNER_RADIUS * cx.scale_factor(),
+            scaled_inner_corner_radius: (CORNER_RADIUS - PADDING) * cx.scale_factor(),
             bounds: cx.bounds(),
             grid_width: grid.params.grid_params.width.load(Ordering::Relaxed) as i32,
             grid_height: grid.params.grid_params.height.load(Ordering::Relaxed) as i32,
@@ -166,6 +170,9 @@ impl DrawGridArgs {
             three_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.three.value()),
             five_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.five.value()),
             seven_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.seven.value()),
+            tuning_tolerance: PitchClassDistance::from_cents_f32(
+                grid.params.tuning_params.tolerance.value(),
+            ),
             font_id,
             mono_font_id,
         }
@@ -173,16 +180,16 @@ impl DrawGridArgs {
 }
 
 struct DrawNodeArgs {
+    draw: bool,
     draw_node_x: f32,
     draw_node_y: f32,
-    base_x: i32,
-    base_y: i32,
     base_z: i32,
     matching_voices: Vec<Voice>,
     pitch_class: PitchClass,
     note_name_info: NoteNameInfo,
     colors: Vec<vg::Color>,
     draw_outline: bool,
+    outline_width: f32,
 }
 
 impl DrawNodeArgs {
@@ -205,7 +212,8 @@ impl DrawNodeArgs {
         let pitch_class: PitchClass =
             primes.pitch_class(args.three_tuning, args.five_tuning, args.seven_tuning);
 
-        let matching_voices = get_matching_voices(pitch_class, &args.sorted_voices);
+        let matching_voices =
+            get_matching_voices(pitch_class, &args.sorted_voices, args.tuning_tolerance);
         let note_name_info = primes.note_name_info();
 
         // Voices whose pitch class matches this node's pitch class
@@ -223,19 +231,23 @@ impl DrawNodeArgs {
             }
         }
 
-        let draw_outline: bool = channels[15];
+        let draw = match base_z {
+            0 => true,
+            -1 | 1 => matching_voices.len() != 0,
+            _ => false,
+        };
 
         DrawNodeArgs {
+            draw,
             draw_node_x,
             draw_node_y,
-            base_x,
-            base_y,
             base_z,
             pitch_class,
             matching_voices,
             note_name_info,
             colors,
-            draw_outline,
+            draw_outline: channels[15],
+            outline_width: args.scaled_padding * OUTLINE_PADDING_RATIO,
         }
     }
 }
@@ -259,7 +271,7 @@ fn prepare_canvas(cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs
         args.bounds.y - args.scaled_padding * 0.4,
         args.bounds.w + args.scaled_padding * 0.8,
         args.bounds.h + args.scaled_padding * 0.8,
-        (CORNER_RADIUS - PADDING * 0.2 * 0.5) * args.scale,
+        (CORNER_RADIUS - PADDING * 0.4) * args.scale,
     );
     canvas.fill_path(&background_path, &vg::Paint::color(COLOR_1));
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
@@ -277,14 +289,6 @@ fn finish_canvas(cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs)
         args.scaled_corner_radius,
     );
     canvas.fill_path(&background_path_refill, &vg::Paint::color(COLOR_1));
-}
-
-fn draw_node(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
-    if node_args.base_z == 0 {
-        draw_node_zero_z(canvas, args, node_args);
-    } else {
-        draw_node_nonzero_z(canvas, args, node_args);
-    }
 }
 
 fn draw_extra_colors(
@@ -330,9 +334,24 @@ fn draw_extra_colors(
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 }
 
+const OUTLINE_PADDING_RATIO: f32 = 0.5;
+const BOTTOM: f32 = PI * 0.5;
+const LEFT: f32 = PI;
+const TOP: f32 = PI * 1.5;
+const RIGHT: f32 = PI * 2.0;
+const QUARTER_ROTATION: f32 = PI * 0.5;
+
+const EXTRA_PIXEL: f32 = 1.0;
+
 /// Draw a node where there are no factors of 7 in the pitch class. This is the regular-sized
 /// rounded rectangle that is always displayed, and covers most of the grid area.
-fn draw_node_zero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
+fn draw_node_zero_z(
+    canvas: &mut Canvas,
+    args: &DrawGridArgs,
+    node_args: &DrawNodeArgs,
+    draw_z_pos: bool,
+    draw_z_neg: bool,
+) {
     // Node rectangle
     let mut node_path = vg::Path::new();
     node_path.rounded_rect(
@@ -340,7 +359,7 @@ fn draw_node_zero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNo
         node_args.draw_node_y,
         NODE_SIZE * args.scale,
         NODE_SIZE * args.scale,
-        (CORNER_RADIUS - PADDING) * args.scale,
+        args.scaled_inner_corner_radius,
     );
 
     if node_args.colors.len() > 0 {
@@ -365,163 +384,304 @@ fn draw_node_zero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNo
     if node_args.draw_outline {
         canvas.stroke_path(
             &node_path,
-            &make_icon_paint(COLOR_3, args.scaled_padding * 0.25),
+            &make_icon_paint(COLOR_3, node_args.outline_width),
         );
     }
 
-    // Note letter name
     let mut text_paint = vg::Paint::color(COLOR_3);
     text_paint.set_font_size(args.scaled_node_size * 0.60);
     text_paint.set_text_align(vg::Align::Right);
-    args.mono_font_id.map(|f| text_paint.set_font(&[f]));
-    let _ = canvas.fill_text(
-        node_args.draw_node_x + args.scaled_node_size * 0.48,
-        node_args.draw_node_y + args.scaled_node_size * 0.58,
-        format!("{}", node_args.note_name_info.letter_name),
-        &text_paint,
-    );
-
-    // Sharps or flats
-    text_paint.set_font_size(args.scaled_node_size * 0.29);
-    text_paint.set_text_align(vg::Align::Left);
-    let _ = canvas.fill_text(
-        node_args.draw_node_x + args.scaled_node_size * 0.48,
-        node_args.draw_node_y + args.scaled_node_size * 0.33,
-        node_args.note_name_info.sharps_or_flats_str(),
-        &text_paint,
-    );
-
-    // Syntonic commas - only displayed if four perfect fifths don't make a third
-    if (args.three_tuning.multiply(4)).distance_to(args.five_tuning)
-        < PitchClassDistance::from_microcents(4000)
-    {
+    if !draw_z_pos {
+        // Note letter name
+        args.mono_font_id.map(|f| text_paint.set_font(&[f]));
         let _ = canvas.fill_text(
             node_args.draw_node_x + args.scaled_node_size * 0.48,
-            node_args.draw_node_y + args.scaled_node_size * 0.59,
-            node_args.note_name_info.syntonic_comma_str(),
+            node_args.draw_node_y + args.scaled_node_size * 0.58,
+            format!("{}", node_args.note_name_info.letter_name),
+            &text_paint,
+        );
+
+        // Sharps or flats
+        text_paint.set_font_size(args.scaled_node_size * 0.29);
+        text_paint.set_text_align(vg::Align::Left);
+        let _ = canvas.fill_text(
+            node_args.draw_node_x + args.scaled_node_size * 0.48,
+            node_args.draw_node_y + args.scaled_node_size * 0.33,
+            node_args.note_name_info.sharps_or_flats_str(),
+            &text_paint,
+        );
+
+        // Syntonic commas - only displayed if four perfect fifths don't make a third
+        if (args.three_tuning.multiply(4)).distance_to(args.five_tuning) > args.tuning_tolerance {
+            let _ = canvas.fill_text(
+                node_args.draw_node_x + args.scaled_node_size * 0.48,
+                node_args.draw_node_y + args.scaled_node_size * 0.59,
+                node_args.note_name_info.syntonic_comma_str(),
+                &text_paint,
+            );
+        }
+    }
+
+    if !draw_z_neg {
+        // Tuning in cents
+        text_paint.set_font_size(args.scaled_node_size * 0.25);
+        text_paint.set_text_align(vg::Align::Center);
+        args.font_id.map(|f| text_paint.set_font(&[f]));
+        let rounded_pitch_class = node_args.pitch_class.round(2);
+        let _ = canvas.fill_text(
+            node_args.draw_node_x + args.scaled_node_size * 0.5,
+            node_args.draw_node_y + args.scaled_node_size * 0.88,
+            format!(
+                "{}.{}{}",
+                node_args.pitch_class.trunc_cents(),
+                rounded_pitch_class.get_decimal_digit_num(0),
+                rounded_pitch_class.get_decimal_digit_num(1),
+            ),
             &text_paint,
         );
     }
 
-    // Tuning in cents
-    text_paint.set_font_size(args.scaled_node_size * 0.25);
-    text_paint.set_text_align(vg::Align::Center);
-    args.font_id.map(|f| text_paint.set_font(&[f]));
-    let rounded_pitch_class = node_args.pitch_class.round(2);
-    let _ = canvas.fill_text(
-        node_args.draw_node_x + args.scaled_node_size * 0.5,
-        node_args.draw_node_y + args.scaled_node_size * 0.88,
-        format!(
-            "{}.{}{}",
-            node_args.pitch_class.trunc_cents(),
-            rounded_pitch_class.get_decimal_digit_num(0),
-            rounded_pitch_class.get_decimal_digit_num(1),
-        ),
-        &text_paint,
-    );
+    // Need to make modifications if the top-right mini-node is to be drawn
+    if draw_z_pos {
+        let (mini_node_x, mini_node_y) = get_mini_node_pos(true, args, node_args);
+        let mini_node_size: f32 = args.scaled_node_size * MINI_NODE_SIZE_RATIO;
+
+        let (background_square_x, background_square_y) =
+            (mini_node_x - args.scaled_padding, mini_node_y);
+        let background_square_size = mini_node_size + args.scaled_padding;
+
+        // Carve out top right region to make space and padding for mini-node
+        let mut negative_path = vg::Path::new();
+
+        // Main rectangle
+        negative_path.rounded_rect_varying(
+            background_square_x,
+            background_square_y - node_args.outline_width * 0.6,
+            background_square_size + node_args.outline_width * 0.6,
+            background_square_size + node_args.outline_width * 0.6,
+            0.0,
+            0.0,
+            0.0,
+            args.scaled_corner_radius - node_args.outline_width * 0.6 * 0.5,
+        );
+
+        let add_corner_negative_path = |path: &mut vg::Path, x: f32, y: f32| {
+            path.move_to(x - args.scaled_inner_corner_radius, y);
+            path.arc_to(
+                x,
+                y,
+                x,
+                y + args.scaled_inner_corner_radius,
+                args.scaled_inner_corner_radius,
+            );
+            path.line_to(
+                x + node_args.outline_width * 0.6,
+                y + args.scaled_inner_corner_radius,
+            );
+            path.line_to(
+                x + node_args.outline_width * 0.6,
+                y - node_args.outline_width * 0.6,
+            );
+            path.line_to(
+                x - args.scaled_inner_corner_radius,
+                y - node_args.outline_width * 0.6,
+            );
+            path.close();
+        };
+
+        // Top left corner
+        add_corner_negative_path(&mut negative_path, background_square_x, background_square_y);
+
+        // Top right corner
+        add_corner_negative_path(
+            &mut negative_path,
+            background_square_x + background_square_size,
+            background_square_y + background_square_size,
+        );
+
+        canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
+        canvas.fill_path(&mut negative_path, &vg::Paint::color(COLOR_0));
+        canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
+
+        if node_args.draw_outline {
+            let mut outline_path = vg::Path::new();
+            // top left
+            outline_path.arc(
+                background_square_x - args.scaled_inner_corner_radius,
+                background_square_y + args.scaled_inner_corner_radius,
+                args.scaled_inner_corner_radius,
+                TOP,
+                RIGHT,
+                vg::Solidity::Hole,
+            );
+
+            // bottom left (larger)
+            outline_path.arc_to(
+                background_square_x,
+                background_square_y + background_square_size,
+                background_square_x + args.scaled_corner_radius,
+                background_square_y + background_square_size,
+                args.scaled_corner_radius,
+            );
+
+            // bottom right
+            outline_path.arc(
+                background_square_x + background_square_size - args.scaled_inner_corner_radius,
+                background_square_y + background_square_size + args.scaled_inner_corner_radius,
+                args.scaled_inner_corner_radius,
+                TOP,
+                RIGHT,
+                vg::Solidity::Hole,
+            );
+
+            canvas.stroke_path(
+                &mut outline_path,
+                &make_icon_paint(COLOR_3, args.scaled_padding * OUTLINE_PADDING_RATIO),
+            );
+        }
+    }
+
+    if draw_z_neg {
+        let (mini_node_x, mini_node_y) = get_mini_node_pos(false, args, node_args);
+        let mini_node_size: f32 = args.scaled_node_size * MINI_NODE_SIZE_RATIO;
+
+        let (background_square_x, background_square_y) =
+            (mini_node_x, mini_node_y - args.scaled_padding);
+        let background_square_size = mini_node_size + args.scaled_padding;
+
+        // Carve out top right region to make space and padding for mini-node
+        let mut negative_path = vg::Path::new();
+
+        // Main rectangle
+        negative_path.rounded_rect_varying(
+            background_square_x - node_args.outline_width * 0.6,
+            background_square_y,
+            background_square_size + node_args.outline_width * 0.6,
+            background_square_size + node_args.outline_width * 0.6,
+            0.0,
+            args.scaled_corner_radius - node_args.outline_width * 0.6 * 0.5,
+            0.0,
+            0.0,
+        );
+
+        let add_corner_negative_path = |path: &mut vg::Path, x: f32, y: f32| {
+            path.move_to(x, y - args.scaled_inner_corner_radius);
+            path.arc_to(
+                x,
+                y,
+                x + args.scaled_inner_corner_radius,
+                y,
+                args.scaled_inner_corner_radius,
+            );
+            path.line_to(
+                x + args.scaled_inner_corner_radius,
+                y + node_args.outline_width * 0.6,
+            );
+            path.line_to(
+                x - node_args.outline_width * 0.6,
+                y + node_args.outline_width * 0.6,
+            );
+            path.line_to(
+                x - node_args.outline_width * 0.6,
+                y - args.scaled_inner_corner_radius,
+            );
+            path.close();
+        };
+
+        // Top left corner
+        add_corner_negative_path(&mut negative_path, background_square_x, background_square_y);
+
+        // Top right corner
+
+        add_corner_negative_path(
+            &mut negative_path,
+            background_square_x + background_square_size,
+            background_square_y + background_square_size,
+        );
+
+        canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
+        canvas.fill_path(&mut negative_path, &vg::Paint::color(COLOR_0));
+        canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
+
+        if node_args.draw_outline {
+            let mut outline_path = vg::Path::new();
+
+            outline_path.move_to(
+                background_square_x,
+                background_square_y - args.scaled_inner_corner_radius,
+            );
+            // top left
+            outline_path.arc_to(
+                background_square_x,
+                background_square_y,
+                background_square_x + args.scaled_inner_corner_radius,
+                background_square_y,
+                args.scaled_inner_corner_radius,
+            );
+
+            // bottom left (larger)
+            outline_path.arc_to(
+                background_square_x + background_square_size,
+                background_square_y,
+                background_square_x + background_square_size,
+                background_square_y + args.scaled_corner_radius,
+                args.scaled_corner_radius,
+            );
+
+            // bottom right
+            outline_path.arc_to(
+                background_square_x + background_square_size,
+                background_square_y + background_square_size,
+                background_square_x + background_square_size + args.scaled_inner_corner_radius,
+                background_square_y + background_square_size,
+                args.scaled_inner_corner_radius,
+            );
+            canvas.stroke_path(
+                &mut outline_path,
+                &make_icon_paint(COLOR_3, args.scaled_padding * OUTLINE_PADDING_RATIO),
+            );
+        }
+    }
 }
 
+static MINI_NODE_SIZE_RATIO: f32 = 3.0 / 7.0;
+
+fn get_mini_node_pos(
+    z_positive: bool,
+    args: &DrawGridArgs,
+    node_args: &DrawNodeArgs,
+) -> (f32, f32) {
+    match z_positive {
+        true => (
+            node_args.draw_node_x
+                + (args.scaled_node_size - args.scaled_node_size * MINI_NODE_SIZE_RATIO),
+            node_args.draw_node_y,
+        ),
+        false => (
+            node_args.draw_node_x,
+            node_args.draw_node_y
+                + (args.scaled_node_size - args.scaled_node_size * MINI_NODE_SIZE_RATIO),
+        ),
+    }
+}
 /// Draw a node with a factor of 7 in the pitch class.
 /// This is a small rounded rectangle on the top right or bottom left of the "main" nodes
 fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
     let dependent_seven = (args.three_tuning.multiply(2) + args.five_tuning.multiply(2))
         .distance_to(args.seven_tuning)
-        < PitchClassDistance::from_microcents(4000);
+        <= args.tuning_tolerance;
 
     if node_args.matching_voices.len() == 0 || node_args.base_z.abs() != 1 || dependent_seven {
         return;
     }
 
-    let mini_node_protrusion: f32 = args.scaled_padding * 0.0;
-    let mini_node_size: f32 = args.scaled_node_size * 3.0 / 7.0;
-    let (mini_node_x, mini_node_y) = if node_args.base_z == 1 {
-        (
-            node_args.draw_node_x + (args.scaled_node_size - mini_node_size) + mini_node_protrusion,
-            node_args.draw_node_y - mini_node_protrusion,
-        )
-    } else {
-        (
-            node_args.draw_node_x - mini_node_protrusion,
-            node_args.draw_node_y + (args.scaled_node_size - mini_node_size) + mini_node_protrusion,
-        )
-    };
+    let mini_node_size: f32 = args.scaled_node_size * MINI_NODE_SIZE_RATIO;
+    let (mini_node_x, mini_node_y) = get_mini_node_pos(node_args.base_z == 1, args, node_args);
 
     let mut background_rect_path = vg::Path::new();
-    /*
-                            background_rect_path.rounded_rect(
-                                mini_node_x - PADDING * scale,
-                                mini_node_y - PADDING * scale,
-                                mini_node_size + PADDING * scale * 2.0,
-                                mini_node_size + PADDING * scale * 2.0,
-                                (CORNER_RADIUS) * scale,
-                            );
-    */
 
     let mut background_rect_arc_path = vg::Path::new();
     let mut second_background_rect_arc_path = vg::Path::new();
-    if node_args.base_z == 1 {
-        background_rect_path.rounded_rect_varying(
-            mini_node_x - args.scaled_padding,
-            mini_node_y - args.scaled_padding * 0.25,
-            mini_node_size + args.scaled_padding * 1.25,
-            mini_node_size + args.scaled_padding * 1.25,
-            0.0,
-            0.0,
-            0.0,
-            CORNER_RADIUS * args.scale,
-        );
-
-        // Top left arc
-        background_rect_arc_path.arc(
-            mini_node_x - CORNER_RADIUS * args.scale,
-            mini_node_y + CORNER_RADIUS * args.scale - args.scaled_padding,
-            (CORNER_RADIUS - PADDING * 0.5) * args.scale,
-            PI * 1.5,
-            PI * 2.0,
-            vg::Solidity::Hole,
-        );
-
-        // Bottom right arc
-        second_background_rect_arc_path.arc(
-            mini_node_x + mini_node_size - CORNER_RADIUS * args.scale + args.scaled_padding,
-            mini_node_y + mini_node_size + CORNER_RADIUS * args.scale,
-            (CORNER_RADIUS - PADDING * 0.5) * args.scale,
-            PI * 1.5,
-            PI * 2.0,
-            vg::Solidity::Hole,
-        );
-    } else {
-        background_rect_path.rounded_rect_varying(
-            mini_node_x - args.scaled_padding * 0.25,
-            mini_node_y - args.scaled_padding,
-            mini_node_size + args.scaled_padding * 1.25,
-            mini_node_size + args.scaled_padding * 1.25,
-            0.0,
-            args.scaled_corner_radius,
-            0.0,
-            0.0,
-        );
-
-        // Top left arc
-        background_rect_arc_path.arc(
-            mini_node_x + args.scaled_corner_radius - args.scaled_padding,
-            mini_node_y - args.scaled_corner_radius, // - PADDING * scale,
-            (CORNER_RADIUS - PADDING * 0.5) * args.scale,
-            PI * 0.5,
-            PI * 1.0,
-            vg::Solidity::Hole,
-        );
-
-        // Bottom right arc
-        second_background_rect_arc_path.arc(
-            mini_node_x + mini_node_size + args.scaled_corner_radius,
-            mini_node_y + mini_node_size - args.scaled_corner_radius + args.scaled_padding,
-            (CORNER_RADIUS - PADDING * 0.5) * args.scale,
-            PI * 0.5,
-            PI * 1.0,
-            vg::Solidity::Hole,
-        );
-    }
 
     canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
 
@@ -541,7 +701,17 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
         mini_node_size,
         (CORNER_RADIUS - PADDING) * args.scale,
     );
-    canvas.fill_path(&mut mini_node_path, &vg::Paint::color(node_args.colors[0]));
+    if node_args.colors.len() > 0 {
+        canvas.fill_path(&mut mini_node_path, &vg::Paint::color(node_args.colors[0]));
+    } else {
+        canvas.fill_path(&mut mini_node_path, &vg::Paint::color(COLOR_2));
+    }
+    if node_args.draw_outline {
+        canvas.stroke_path(
+            &mini_node_path,
+            &make_icon_paint(COLOR_3, node_args.outline_width),
+        );
+    }
 
     canvas.global_composite_operation(vg::CompositeOperation::Atop);
     draw_extra_colors(
@@ -615,25 +785,40 @@ impl View for Grid {
             (args.grid_height / 2) as i32,
         );
 
-        // Draw lattice nodes one by one
-        // z = sevens
-        for base_z in [0, -1, 1] {
-            // x = fives
-            for base_x in 0..args.grid_width + extra_right {
-                // y = threes
-                for base_y in -extra_top..args.grid_height {
-                    // Number of factors of each prime in the pitch class represented by this node
-                    let primes = PrimeCountVector::new(
-                        y_offset - i32::from(base_y) + args.grid_y.floor() as i32,
-                        i32::from(base_x - x_offset) + args.grid_x.floor() as i32,
-                        base_z + args.grid_z,
-                    );
+        // x = fives
+        for base_x in 0..args.grid_width + extra_right {
+            // y = threes
+            for base_y in -extra_top..args.grid_height {
+                // Draw lattice nodes one by one
+                // z = sevens
+                let make_draw_node_args = |base_z| {
+                    DrawNodeArgs::new(
+                        &args,
+                        base_x,
+                        base_y,
+                        base_z,
+                        PrimeCountVector::new(
+                            y_offset - i32::from(base_y) + args.grid_y.floor() as i32,
+                            i32::from(base_x - x_offset) + args.grid_x.floor() as i32,
+                            base_z + args.grid_z,
+                        ),
+                    )
+                };
+                let (node_args_zero_z, node_args_pos_z, node_args_neg_z) = (
+                    make_draw_node_args(0),
+                    make_draw_node_args(1),
+                    make_draw_node_args(-1),
+                );
 
-                    let node_args: DrawNodeArgs =
-                        DrawNodeArgs::new(&args, base_x, base_y, base_z, primes);
-
-                    draw_node(canvas, &args, &node_args);
-                }
+                draw_node_zero_z(
+                    canvas,
+                    &args,
+                    &node_args_zero_z,
+                    node_args_pos_z.draw,
+                    node_args_neg_z.draw,
+                );
+                draw_node_nonzero_z(canvas, &args, &node_args_pos_z);
+                draw_node_nonzero_z(canvas, &args, &node_args_neg_z);
             }
         }
 
@@ -659,12 +844,12 @@ impl Grid {
     }
 }
 
-/// Tolerance of 1000 microcents - i.e. 0.001 cents.
-/// Necessary because the tuning parameter is stored as a float, so less precise than [`PitchClass`]
-const TOLERANCE: PitchClassDistance = PitchClassDistance::from_microcents(1000);
-
 /// Returns the subset of a vector of voices with a given pitch class.
-fn get_matching_voices(pitch_class: PitchClass, sorted_voices: &Vec<Voice>) -> Vec<Voice> {
+fn get_matching_voices(
+    pitch_class: PitchClass,
+    sorted_voices: &Vec<Voice>,
+    tuning_tolerance: PitchClassDistance,
+) -> Vec<Voice> {
     let mut matching_voices: Vec<Voice> = Vec::new();
 
     if sorted_voices.len() == 0 {
@@ -674,7 +859,7 @@ fn get_matching_voices(pitch_class: PitchClass, sorted_voices: &Vec<Voice>) -> V
     // Start at the first voice whose pitch class is greater than or equal to the node's
     let start_idx: usize = sorted_voices.partition_point(|v| {
         v.get_pitch_class() < pitch_class
-            && v.get_pitch_class().distance_to(pitch_class) > TOLERANCE
+            && v.get_pitch_class().distance_to(pitch_class) > tuning_tolerance
     });
 
     if start_idx == sorted_voices.len() {
@@ -688,7 +873,7 @@ fn get_matching_voices(pitch_class: PitchClass, sorted_voices: &Vec<Voice>) -> V
         if sorted_voices[idx]
             .get_pitch_class()
             .distance_to(pitch_class)
-            > TOLERANCE
+            > tuning_tolerance
         {
             break;
         }
@@ -714,7 +899,7 @@ fn get_matching_voices(pitch_class: PitchClass, sorted_voices: &Vec<Voice>) -> V
         if sorted_voices[idx]
             .get_pitch_class()
             .distance_to(pitch_class)
-            > TOLERANCE
+            > tuning_tolerance
         {
             break;
         }

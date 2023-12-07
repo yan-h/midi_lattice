@@ -150,15 +150,24 @@ pub struct PitchClassDistance(u32);
 impl PitchClassDistance {
     pub const fn from_microcents(microcents: u32) -> PitchClassDistance {
         // Can't use cmp or min if we want this to be a const fn
-        let flipped_microcents = OCTAVE_MICROCENTS - microcents;
-        PitchClassDistance(if microcents < flipped_microcents {
-            microcents
+        let modded_microcents = microcents % OCTAVE_MICROCENTS;
+        let flipped_microcents = OCTAVE_MICROCENTS - modded_microcents;
+        PitchClassDistance(if modded_microcents < flipped_microcents {
+            modded_microcents
         } else {
             flipped_microcents
         })
     }
     pub const fn from_cents(cents: u32) -> PitchClassDistance {
         Self::from_microcents(cents * CENTS_TO_MICROCENTS)
+    }
+
+    pub fn from_cents_f32(cents: f32) -> PitchClassDistance {
+        Self::from_microcents((cents.rem_euclid(1200.0) * CENTS_TO_MICROCENTS_F32).round() as u32)
+    }
+
+    pub fn scale(&self, factor: u32) -> PitchClassDistance {
+        PitchClassDistance(self.0 * factor)
     }
 }
 
