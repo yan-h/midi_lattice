@@ -31,7 +31,7 @@ mod tuning_learn_button;
 pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
 pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
 
-pub const PADDING: f32 = grid::NODE_SIZE * 0.08;
+pub const PADDING: f32 = grid::NODE_SIZE * 0.07;
 pub const CORNER_RADIUS: f32 = PADDING * 1.6;
 
 #[derive(Lens, Clone)]

@@ -335,13 +335,8 @@ fn draw_extra_colors(
 }
 
 const OUTLINE_PADDING_RATIO: f32 = 0.5;
-const BOTTOM: f32 = PI * 0.5;
-const LEFT: f32 = PI;
 const TOP: f32 = PI * 1.5;
 const RIGHT: f32 = PI * 2.0;
-const QUARTER_ROTATION: f32 = PI * 0.5;
-
-const EXTRA_PIXEL: f32 = 1.0;
 
 /// Draw a node where there are no factors of 7 in the pitch class. This is the regular-sized
 /// rounded rectangle that is always displayed, and covers most of the grid area.
@@ -352,97 +347,186 @@ fn draw_node_zero_z(
     draw_z_pos: bool,
     draw_z_neg: bool,
 ) {
-    // Node rectangle
-    let mut node_path = vg::Path::new();
-    node_path.rounded_rect(
-        node_args.draw_node_x,
-        node_args.draw_node_y,
-        NODE_SIZE * args.scale,
-        NODE_SIZE * args.scale,
-        args.scaled_inner_corner_radius,
-    );
-
-    if node_args.colors.len() > 0 {
-        canvas.fill_path(&mut node_path, &vg::Paint::color(node_args.colors[0]));
-        if node_args.colors.len() > 1 {
-            canvas.global_composite_operation(vg::CompositeOperation::Atop);
-            draw_extra_colors(
-                canvas,
-                node_args,
-                node_args.draw_node_x,
-                node_args.draw_node_y,
-                args.scaled_node_size,
-                7,
-            );
-            canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
-        }
-    } else {
-        canvas.fill_path(&mut node_path, &vg::Paint::color(COLOR_2));
+    draw_main_node_square(canvas, args, node_args);
+    draw_note_name(canvas, args, node_args, draw_z_pos, draw_z_neg);
+    draw_tuning_cents(canvas, args, node_args, draw_z_neg);
+    if draw_z_pos {
+        remove_top_right_corner(canvas, args, node_args);
+    }
+    if draw_z_neg {
+        remove_bottom_left_corner(canvas, args, node_args);
     }
 
-    // Draw outline for channel 16
-    if node_args.draw_outline {
-        canvas.stroke_path(
-            &node_path,
-            &make_icon_paint(COLOR_3, node_args.outline_width),
+    fn draw_main_node_square(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
+        let mut node_path = vg::Path::new();
+        node_path.rounded_rect(
+            node_args.draw_node_x,
+            node_args.draw_node_y,
+            NODE_SIZE * args.scale,
+            NODE_SIZE * args.scale,
+            args.scaled_inner_corner_radius,
         );
+        if node_args.colors.len() > 0 {
+            canvas.fill_path(&mut node_path, &vg::Paint::color(node_args.colors[0]));
+            if node_args.colors.len() > 1 {
+                canvas.global_composite_operation(vg::CompositeOperation::Atop);
+                draw_extra_colors(
+                    canvas,
+                    node_args,
+                    node_args.draw_node_x,
+                    node_args.draw_node_y,
+                    args.scaled_node_size,
+                    7,
+                );
+                canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
+            }
+        } else {
+            canvas.fill_path(&mut node_path, &vg::Paint::color(COLOR_2));
+        }
+
+        // Draw outline for channel 16
+        if node_args.draw_outline {
+            canvas.stroke_path(
+                &node_path,
+                &make_icon_paint(COLOR_3, node_args.outline_width),
+            );
+        }
     }
 
-    let mut text_paint = vg::Paint::color(COLOR_3);
-    text_paint.set_font_size(args.scaled_node_size * 0.60);
-    text_paint.set_text_align(vg::Align::Right);
-    if !draw_z_pos {
-        // Note letter name
+    fn draw_note_name(
+        canvas: &mut Canvas,
+        args: &DrawGridArgs,
+        node_args: &DrawNodeArgs,
+        draw_z_pos: bool,
+        draw_z_neg: bool,
+    ) {
+        let mut text_paint = vg::Paint::color(COLOR_3);
+        text_paint.set_text_align(vg::Align::Right);
+
+        let show_syntonic_commas =
+            args.three_tuning.multiply(4).distance_to(args.five_tuning) > args.tuning_tolerance;
+        let max_accidental_str_len = (if show_syntonic_commas {
+            node_args.note_name_info.syntonic_commas.abs()
+        } else {
+            0
+        })
+        .max(node_args.note_name_info.sharps_or_flats.abs())
+        .min(2);
+
+        let (letter_name_size, align_x, letter_name_y) = if !draw_z_pos && !draw_z_neg {
+            // Standard position
+            (0.60, 0.48, 0.58)
+        } else if !draw_z_pos && draw_z_neg {
+            // Centered horizontally on top half
+            (0.50, 0.48, 0.44)
+        } else if draw_z_pos && !draw_z_neg {
+            // Centered vertically on left half
+            match max_accidental_str_len {
+                0 => (0.60, 0.48, 0.58),
+                1 => (0.45, 0.32, 0.58),
+                _ => (0.37, 0.26, 0.58),
+            }
+        } else {
+            // Squished into top left corner
+            match max_accidental_str_len {
+                0 => (0.45, 0.38, 0.41),
+                1 => (0.45, 0.30, 0.41),
+                _ => (0.36, 0.25, 0.385),
+            }
+        };
+
+        let accidentals_size = letter_name_size * 0.48;
+        let sharps_flats_y = letter_name_y - accidentals_size * 0.88;
+        let syntonic_commas_y = sharps_flats_y + accidentals_size * 0.84;
+
+        text_paint.set_font_size(args.scaled_node_size * letter_name_size);
+
+        // Letter name
         args.mono_font_id.map(|f| text_paint.set_font(&[f]));
         let _ = canvas.fill_text(
-            node_args.draw_node_x + args.scaled_node_size * 0.48,
-            node_args.draw_node_y + args.scaled_node_size * 0.58,
+            node_args.draw_node_x + args.scaled_node_size * align_x,
+            node_args.draw_node_y + args.scaled_node_size * letter_name_y,
             format!("{}", node_args.note_name_info.letter_name),
             &text_paint,
         );
 
         // Sharps or flats
-        text_paint.set_font_size(args.scaled_node_size * 0.29);
+        text_paint.set_font_size(args.scaled_node_size * accidentals_size);
         text_paint.set_text_align(vg::Align::Left);
         let _ = canvas.fill_text(
-            node_args.draw_node_x + args.scaled_node_size * 0.48,
-            node_args.draw_node_y + args.scaled_node_size * 0.33,
+            node_args.draw_node_x + args.scaled_node_size * align_x,
+            node_args.draw_node_y + args.scaled_node_size * sharps_flats_y,
             node_args.note_name_info.sharps_or_flats_str(),
             &text_paint,
         );
 
         // Syntonic commas - only displayed if four perfect fifths don't make a third
-        if (args.three_tuning.multiply(4)).distance_to(args.five_tuning) > args.tuning_tolerance {
+        if show_syntonic_commas {
             let _ = canvas.fill_text(
-                node_args.draw_node_x + args.scaled_node_size * 0.48,
-                node_args.draw_node_y + args.scaled_node_size * 0.59,
+                node_args.draw_node_x + args.scaled_node_size * align_x,
+                node_args.draw_node_y + args.scaled_node_size * syntonic_commas_y,
                 node_args.note_name_info.syntonic_comma_str(),
                 &text_paint,
             );
         }
     }
 
-    if !draw_z_neg {
-        // Tuning in cents
-        text_paint.set_font_size(args.scaled_node_size * 0.25);
+    fn draw_tuning_cents(
+        canvas: &mut Canvas,
+        args: &DrawGridArgs,
+        node_args: &DrawNodeArgs,
+        draw_z_neg: bool,
+    ) {
+        let mut text_paint = vg::Paint::color(COLOR_3);
         text_paint.set_text_align(vg::Align::Center);
         args.font_id.map(|f| text_paint.set_font(&[f]));
-        let rounded_pitch_class = node_args.pitch_class.round(2);
-        let _ = canvas.fill_text(
-            node_args.draw_node_x + args.scaled_node_size * 0.5,
-            node_args.draw_node_y + args.scaled_node_size * 0.88,
-            format!(
-                "{}.{}{}",
-                node_args.pitch_class.trunc_cents(),
-                rounded_pitch_class.get_decimal_digit_num(0),
-                rounded_pitch_class.get_decimal_digit_num(1),
-            ),
-            &text_paint,
-        );
+        if draw_z_neg {
+            text_paint.set_font_size(args.scaled_node_size * 0.21);
+            let removed_square_size =
+                MINI_NODE_SIZE_RATIO * args.scaled_node_size + args.scaled_padding;
+            let (x, y) = (
+                node_args.draw_node_x + removed_square_size,
+                node_args.draw_node_y + removed_square_size,
+            );
+            let size = args.scaled_node_size - removed_square_size;
+
+            let _ = canvas.fill_text(
+                x + size * 0.5,
+                y + size * 0.48,
+                node_args.pitch_class.trunc_cents().to_string(),
+                &text_paint,
+            );
+
+            text_paint.set_font_size(args.scaled_node_size * 0.18);
+            let rounded_pitch_class = node_args.pitch_class.round(2);
+            let _ = canvas.fill_text(
+                x + size * 0.5,
+                y + size * 0.8,
+                format!(
+                    ".{}{}",
+                    rounded_pitch_class.get_decimal_digit_num(0),
+                    rounded_pitch_class.get_decimal_digit_num(1),
+                ),
+                &text_paint,
+            );
+        } else {
+            text_paint.set_font_size(args.scaled_node_size * 0.25);
+            let rounded_pitch_class = node_args.pitch_class.round(2);
+            let _ = canvas.fill_text(
+                node_args.draw_node_x + args.scaled_node_size * 0.5,
+                node_args.draw_node_y + args.scaled_node_size * 0.88,
+                format!(
+                    "{}.{}{}",
+                    node_args.pitch_class.trunc_cents(),
+                    rounded_pitch_class.get_decimal_digit_num(0),
+                    rounded_pitch_class.get_decimal_digit_num(1),
+                ),
+                &text_paint,
+            );
+        }
     }
 
-    // Need to make modifications if the top-right mini-node is to be drawn
-    if draw_z_pos {
+    fn remove_top_right_corner(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
         let (mini_node_x, mini_node_y) = get_mini_node_pos(true, args, node_args);
         let mini_node_size: f32 = args.scaled_node_size * MINI_NODE_SIZE_RATIO;
 
@@ -541,7 +625,11 @@ fn draw_node_zero_z(
         }
     }
 
-    if draw_z_neg {
+    fn remove_bottom_left_corner(
+        canvas: &mut Canvas,
+        args: &DrawGridArgs,
+        node_args: &DrawNodeArgs,
+    ) {
         let (mini_node_x, mini_node_y) = get_mini_node_pos(false, args, node_args);
         let mini_node_size: f32 = args.scaled_node_size * MINI_NODE_SIZE_RATIO;
 
@@ -667,9 +755,8 @@ fn get_mini_node_pos(
 /// Draw a node with a factor of 7 in the pitch class.
 /// This is a small rounded rectangle on the top right or bottom left of the "main" nodes
 fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
-    let dependent_seven = (args.three_tuning.multiply(2) + args.five_tuning.multiply(2))
-        .distance_to(args.seven_tuning)
-        <= args.tuning_tolerance;
+    let dependent_seven =
+        (args.three_tuning.multiply(-2)).distance_to(args.seven_tuning) <= args.tuning_tolerance;
 
     if node_args.matching_voices.len() == 0 || node_args.base_z.abs() != 1 || dependent_seven {
         return;
