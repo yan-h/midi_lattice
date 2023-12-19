@@ -3,15 +3,14 @@ use crate::Voices;
 
 use crate::assets;
 use crate::editor::make_icon_paint;
-use crate::editor::make_icon_stroke_paint;
 use crate::editor::COLOR_0;
-use crate::editor::COLOR_1_DARKER;
+use crate::editor::COLOR_2_HIGHLIGHT;
 use crate::midi::Voice;
+use crate::tuning;
 use crate::tuning::NoteNameInfo;
 use crate::tuning::PitchClass;
 use crate::tuning::PitchClassDistance;
 use crate::tuning::PrimeCountVector;
-use crate::tuning::CENTS_TO_MICROCENTS;
 use color_space::Lch;
 use color_space::Rgb;
 use nih_plug::prelude::*;
@@ -19,12 +18,13 @@ use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::vizia::vg::FontId;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::f32::consts::PI;
-use std::str::MatchIndices;
 use std::sync::atomic::Ordering;
+use std::sync::MutexGuard;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use std::u128::MIN;
 use triple_buffer::Output;
 
 use crate::editor::{COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS, PADDING};
@@ -39,12 +39,22 @@ pub struct Grid {
 
     // Need interior mutability to allow mutation from draw()
     font_info: Mutex<FontInfo>,
+
+    // Need interior mutability to allow mutation from draw()
+    animation_info: Mutex<AnimationInfo>,
+}
+
+/// Additional state for displaying things that aren't captured by the current voices
+pub struct AnimationInfo {
+    /// Recent pitch classes are highlighted for a short duration.
+    /// This stores the set of recent voices, with the amount of time left for each.
+    recent_pitch_classes: HashMap<PitchClass, Duration>,
+
+    /// Timestamp of the last draw() call
+    last_tick: Instant,
 }
 
 /// Stores info about fonts for femtovg's canvas.
-/// I don't know a away to get access to the canvas apart from draw()
-/// We only get an immutable reference to Lattice display in draw()
-/// Therefore, we wrap this structure in a mutex and update when loading fonts in the first draw.
 struct FontInfo {
     loaded: bool,
     font_id: Option<FontId>,
@@ -60,10 +70,6 @@ impl Default for FontInfo {
         }
     }
 }
-pub struct Node {
-    pitch_class: f64,
-    pitches: Vec<f32>,
-}
 
 impl Grid {
     pub fn new<LParams, LVoices>(
@@ -78,6 +84,10 @@ impl Grid {
         Self {
             params: params.get(cx),
             voices_output: voices_output.get(cx),
+            animation_info: Mutex::new(AnimationInfo {
+                recent_pitch_classes: HashMap::new(),
+                last_tick: Instant::now(),
+            }),
             font_info: Mutex::new(FontInfo::default()),
         }
         .build(cx, |_cx| {})
@@ -91,6 +101,53 @@ impl Grid {
             font_info.mono_font_id = canvas.add_font_mem(assets::ROBOTO_MONO_REGULAR).ok();
         }
         (font_info.font_id, font_info.mono_font_id)
+    }
+
+    fn update_and_get_highlighted_pitch_classes(
+        &self,
+        voices: &Vec<Voice>,
+        highlight_duration: Duration,
+    ) -> Vec<PitchClass> {
+        let mut animation_info: MutexGuard<'_, AnimationInfo> = self.animation_info.lock().unwrap();
+        let time_since_last_draw: Duration = Instant::now() - animation_info.last_tick;
+
+        // Tick timer on all pitch classes
+        for time_left in animation_info.recent_pitch_classes.values_mut() {
+            if time_since_last_draw > *time_left {
+                *time_left = Duration::ZERO;
+            } else {
+                *time_left -= time_since_last_draw;
+                // Limit to current highlight duration. Prevents long-lived higlights if duration
+                // parameter is reduced significantly
+                *time_left = highlight_duration.min(*time_left);
+            }
+        }
+
+        animation_info.last_tick = Instant::now();
+
+        // Refresh currently playing pitch classes
+        for voice in voices.iter() {
+            if voice.get_channel() != 15 {
+                animation_info
+                    .recent_pitch_classes
+                    .insert(voice.get_pitch_class(), highlight_duration);
+            }
+        }
+
+        // Drop expired pitch classes
+        animation_info
+            .recent_pitch_classes
+            .retain(|_, v: &mut Duration| *v > Duration::ZERO);
+
+        // Collect, sort and return set of surviving pitch classes
+        let mut result: Vec<PitchClass> = animation_info
+            .recent_pitch_classes
+            .keys()
+            .cloned()
+            .collect();
+        result.sort();
+
+        result
     }
 }
 
@@ -121,8 +178,8 @@ static CHANNEL_COLORS: Lazy<[vg::Color; 15]> = Lazy::new(|| {
         Lch::new(60.0, 40.0, 280.0), // 12 blue
         Lch::new(50.0, 55.0, 305.0), // 13 purple
         Lch::new(70.0, 30.0, 340.0), // 14 pink
-        // Don't know what to do with 15. 16 is just an outline
-        Lch::new(0.0, 0.0, 35.0), // 15 black, because why not
+        Lch::new(0.0, 0.0, 35.0),    // 15 black, because why not
+                                     // 16 is just an outline, so it has no entry here
     ]
     .map(|x| lch_to_vg_color(x))
 });
@@ -147,12 +204,21 @@ struct DrawGridArgs {
     tuning_tolerance: PitchClassDistance,
     font_id: Option<FontId>,
     mono_font_id: Option<FontId>,
+    highlighted_pitch_classes: Vec<PitchClass>,
 }
 
 impl DrawGridArgs {
     fn new(grid: &Grid, cx: &mut DrawContext, canvas: &mut Canvas) -> DrawGridArgs {
         let (font_id, mono_font_id): (Option<FontId>, Option<FontId>) =
             grid.load_and_get_fonts(canvas);
+
+        let sorted_voices = grid.get_sorted_voices();
+
+        let highlight_duration =
+            Duration::from_secs_f32(grid.params.grid_params.highlight_time.value());
+
+        let highlighted_pitch_classes =
+            grid.update_and_get_highlighted_pitch_classes(&sorted_voices, highlight_duration);
 
         DrawGridArgs {
             scale: cx.scale_factor(),
@@ -166,7 +232,7 @@ impl DrawGridArgs {
             grid_x: grid.params.grid_params.x.value(),
             grid_y: grid.params.grid_params.y.value(),
             grid_z: grid.params.grid_params.z.value(),
-            sorted_voices: grid.get_sorted_voices(),
+            sorted_voices,
             three_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.three.value()),
             five_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.five.value()),
             seven_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.seven.value()),
@@ -175,6 +241,7 @@ impl DrawGridArgs {
             ),
             font_id,
             mono_font_id,
+            highlighted_pitch_classes,
         }
     }
 }
@@ -190,6 +257,7 @@ struct DrawNodeArgs {
     colors: Vec<vg::Color>,
     draw_outline: bool,
     outline_width: f32,
+    highlighted: bool,
 }
 
 impl DrawNodeArgs {
@@ -214,6 +282,13 @@ impl DrawNodeArgs {
 
         let matching_voices =
             get_matching_voices(pitch_class, &args.sorted_voices, args.tuning_tolerance);
+
+        let highlighted = has_matching_pitch_class(
+            pitch_class,
+            &args.highlighted_pitch_classes,
+            args.tuning_tolerance,
+        );
+
         let note_name_info = primes.note_name_info();
 
         // Voices whose pitch class matches this node's pitch class
@@ -233,7 +308,12 @@ impl DrawNodeArgs {
 
         let draw = match base_z {
             0 => true,
-            -1 | 1 => matching_voices.len() != 0,
+            -1 | 1 => {
+                let dependent_seven = (args.three_tuning.multiply(-2))
+                    .distance_to(args.seven_tuning)
+                    <= args.tuning_tolerance;
+                !dependent_seven && (matching_voices.len() != 0 || highlighted)
+            }
             _ => false,
         };
 
@@ -248,6 +328,7 @@ impl DrawNodeArgs {
             colors,
             draw_outline: channels[15],
             outline_width: args.scaled_padding * OUTLINE_PADDING_RATIO,
+            highlighted,
         }
     }
 }
@@ -340,6 +421,7 @@ const RIGHT: f32 = PI * 2.0;
 
 /// Draw a node where there are no factors of 7 in the pitch class. This is the regular-sized
 /// rounded rectangle that is always displayed, and covers most of the grid area.
+/// If smaller nodes for 7 are displayed, this node changes appearance to make room.
 fn draw_node_zero_z(
     canvas: &mut Canvas,
     args: &DrawGridArgs,
@@ -381,7 +463,14 @@ fn draw_node_zero_z(
                 canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
             }
         } else {
-            canvas.fill_path(&mut node_path, &vg::Paint::color(COLOR_2));
+            canvas.fill_path(
+                &mut node_path,
+                &vg::Paint::color(if node_args.highlighted {
+                    COLOR_2_HIGHLIGHT
+                } else {
+                    COLOR_2
+                }),
+            );
         }
 
         // Draw outline for channel 16
@@ -755,10 +844,7 @@ fn get_mini_node_pos(
 /// Draw a node with a factor of 7 in the pitch class.
 /// This is a small rounded rectangle on the top right or bottom left of the "main" nodes
 fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
-    let dependent_seven =
-        (args.three_tuning.multiply(-2)).distance_to(args.seven_tuning) <= args.tuning_tolerance;
-
-    if node_args.matching_voices.len() == 0 || node_args.base_z.abs() != 1 || dependent_seven {
+    if !node_args.draw {
         return;
     }
 
@@ -791,7 +877,14 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
     if node_args.colors.len() > 0 {
         canvas.fill_path(&mut mini_node_path, &vg::Paint::color(node_args.colors[0]));
     } else {
-        canvas.fill_path(&mut mini_node_path, &vg::Paint::color(COLOR_2));
+        canvas.fill_path(
+            &mut mini_node_path,
+            &vg::Paint::color(if node_args.highlighted {
+                COLOR_2_HIGHLIGHT
+            } else {
+                COLOR_2
+            }),
+        );
     }
     if node_args.draw_outline {
         canvas.stroke_path(
@@ -929,6 +1022,33 @@ impl Grid {
         sorted_voices.sort_unstable_by(|v1, v2| v1.get_pitch_class().cmp(&v2.get_pitch_class()));
         sorted_voices
     }
+}
+
+// Returns whether a pitch class matches any in a list of sorted pitch classes
+fn has_matching_pitch_class(
+    pitch_class: PitchClass,
+    sorted_pitch_classes: &Vec<PitchClass>,
+    tuning_tolerance: PitchClassDistance,
+) -> bool {
+    if sorted_pitch_classes.len() == 0 {
+        return false;
+    }
+
+    let first_greater_idx: usize = sorted_pitch_classes.partition_point(|pc| pc < &pitch_class);
+    if first_greater_idx == sorted_pitch_classes.len() {
+        return sorted_pitch_classes[first_greater_idx - 1].distance_to(pitch_class)
+            <= tuning_tolerance;
+    }
+    if sorted_pitch_classes[first_greater_idx].distance_to(pitch_class) <= tuning_tolerance {
+        return true;
+    }
+
+    let last_lesser_idx: usize = if first_greater_idx > 0 {
+        first_greater_idx - 1
+    } else {
+        sorted_pitch_classes.len() - 1
+    };
+    sorted_pitch_classes[last_lesser_idx].distance_to(pitch_class) <= tuning_tolerance
 }
 
 /// Returns the subset of a vector of voices with a given pitch class.

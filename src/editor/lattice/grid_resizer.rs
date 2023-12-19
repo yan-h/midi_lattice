@@ -52,7 +52,7 @@ impl View for GridResizer {
             }
             _ => {}
         });
-        event.map(|window_event, meta| match *window_event {
+        event.map(|window_event, _meta| match *window_event {
             WindowEvent::MouseDown(MouseButton::Left) => {
                 cx.capture();
                 self.drag_active = true;
@@ -70,7 +70,7 @@ impl View for GridResizer {
             WindowEvent::MouseOut => {
                 self.mouse_over = false;
             }
-            WindowEvent::MouseMove(x, y) => {
+            WindowEvent::MouseMove(_x, _y) => {
                 if self.drag_active {
                     let (width, height) = (
                         width_to_grid_width(

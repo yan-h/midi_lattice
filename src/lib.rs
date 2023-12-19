@@ -33,11 +33,11 @@ pub struct MidiLatticeParams {
     #[persist = "editor-state"]
     pub editor_state: Arc<ViziaState>,
 
-    #[nested(group = "grid")]
-    pub grid_params: Arc<GridParams>,
-
     #[nested(group = "tuning")]
     pub tuning_params: Arc<TuningParams>,
+
+    #[nested(group = "grid")]
+    pub grid_params: Arc<GridParams>,
 }
 
 #[derive(Params)]
@@ -58,8 +58,12 @@ pub struct GridParams {
     #[id = "grid-y"]
     pub y: FloatParam,
 
+    // Z offset of the grid form the origin, C
     #[id = "grid-z"]
     pub z: IntParam,
+
+    #[id = "highlight-time"]
+    pub highlight_time: FloatParam,
 }
 
 const MAX_GRID_OFFSET: f32 = 20.0;
@@ -91,6 +95,15 @@ impl Default for GridParams {
                 IntRange::Linear {
                     min: -MAX_GRID_OFFSET as i32,
                     max: MAX_GRID_OFFSET as i32,
+                },
+            ),
+            highlight_time: FloatParam::new(
+                "Note Highlight (sec)",
+                1.0,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 100.0,
+                    factor: FloatRange::skew_factor(-2.0),
                 },
             ),
         }

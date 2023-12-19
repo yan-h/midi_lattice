@@ -4,10 +4,8 @@ use nih_plug_vizia::vizia::{prelude::*, vg};
 use nih_plug_vizia::widgets::ParamEvent;
 use triple_buffer::Output;
 
-use crate::midi::Voice;
 use crate::tuning::*;
 use crate::{TuningParams, Voices};
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;

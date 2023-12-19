@@ -2,11 +2,9 @@ use crate::editor::lattice::grid::NODE_SIZE;
 use crate::editor::lattice::LatticeEvent;
 use crate::editor::*;
 use crate::GridParams;
-use crate::MAX_GRID_OFFSET;
 
 use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::vg;
-use nih_plug_vizia::widgets::param_base::ParamWidgetBase;
 use nih_plug_vizia::widgets::ParamEvent;
 use std::sync::Arc;
 
@@ -45,10 +43,6 @@ impl DragRegion {
         }
         .build(cx, |_| {})
     }
-}
-
-fn normalize_grid_position(pos: f32) -> f32 {
-    (pos + MAX_GRID_OFFSET) / (MAX_GRID_OFFSET * 2.0)
 }
 
 impl View for DragRegion {

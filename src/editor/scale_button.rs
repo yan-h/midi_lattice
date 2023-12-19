@@ -1,7 +1,4 @@
-use std::cmp::min;
-
-use nih_plug::nih_dbg;
-use nih_plug::nih_log;
+use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 

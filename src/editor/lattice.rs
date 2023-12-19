@@ -23,8 +23,6 @@ pub struct Lattice {
     params: Arc<MidiLatticeParams>,
     voices_output: Arc<Mutex<Output<Voices>>>,
     mouse_over: bool,
-    drag_active: bool,
-    start_physical_coordinates: (f32, f32),
 }
 
 impl Lattice {
@@ -41,8 +39,6 @@ impl Lattice {
             params: params.get(cx),
             voices_output: voices_output.get(cx),
             mouse_over: false,
-            drag_active: false,
-            start_physical_coordinates: (0.0, 0.0),
         }
         .build(
             cx,

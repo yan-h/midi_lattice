@@ -30,7 +30,7 @@ const CENTS_TO_MICROCENTS_F32: f32 = CENTS_TO_MICROCENTS as f32;
 
 /// Representation of pitch classes as an integer number of microcents.
 /// Avoids the complexity of floating point number comparison, ordering, precision, etc.
-#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Debug)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Debug, Hash)]
 pub struct PitchClass(u32);
 
 impl Display for PitchClass {

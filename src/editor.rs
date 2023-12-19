@@ -21,8 +21,6 @@ use nih_plug_vizia::{create_vizia_editor, ViziaTheming};
 use std::sync::{Arc, Mutex};
 use triple_buffer::Output;
 
-use self::lattice::grid::NODE_SIZE;
-
 mod lattice;
 mod resizer;
 mod scale_button;
@@ -31,8 +29,8 @@ mod tuning_learn_button;
 pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
 pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
 
-pub const PADDING: f32 = grid::NODE_SIZE * 0.07;
-pub const CORNER_RADIUS: f32 = PADDING * 1.6;
+pub const PADDING: f32 = grid::NODE_SIZE * 0.08;
+pub const CORNER_RADIUS: f32 = PADDING * 1.5;
 
 #[derive(Lens, Clone)]
 pub struct Data {
@@ -72,16 +70,16 @@ pub static COLOR_1: vg::Color = vg::Color::rgbf(
     0x60 as f32 / 255.0,
 );
 
-pub static COLOR_1_DARKER: vg::Color = vg::Color::rgbf(
-    0x54 as f32 / 255.0,
-    0x54 as f32 / 255.0,
-    0x54 as f32 / 255.0,
+pub static COLOR_2: vg::Color = vg::Color::rgbf(
+    0x84 as f32 / 255.0,
+    0x84 as f32 / 255.0,
+    0x84 as f32 / 255.0,
 );
 
-pub static COLOR_2: vg::Color = vg::Color::rgbf(
-    0x8A as f32 / 255.0,
-    0x8A as f32 / 255.0,
-    0x8A as f32 / 255.0,
+pub static COLOR_2_HIGHLIGHT: vg::Color = vg::Color::rgbf(
+    0x9A as f32 / 255.0,
+    0x9A as f32 / 255.0,
+    0x9A as f32 / 255.0,
 );
 
 // Brightest color
@@ -120,14 +118,6 @@ pub fn width_to_grid_width(width: f32) -> u8 {
     )
 }
 
-pub fn lattice_width_pixels(grid_width: u8) -> f32 {
-    grid_width as f32 * NODE_SIZE + (grid_width as f32 + 1.0) * PADDING
-}
-
-pub fn lattice_height_pixels(grid_height: u8) -> f32 {
-    grid_height as f32 * NODE_SIZE + (grid_height as f32 + 1.0) * PADDING
-}
-
 pub fn height_to_grid_height(height: f32) -> u8 {
     min(
         MAX_GRID_HEIGHT,
@@ -156,18 +146,13 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
     create_vizia_editor(
         data.params.editor_state.clone(),
         ViziaTheming::None,
-        move |cx, gui_cx| {
+        move |cx, _gui_cx| {
             let _ = cx.add_stylesheet(include_str!("../assets/theme.css"));
             //ParamSetter::new(_gui_ctx.as_ref());
             assets::register_quicksand(cx);
             cx.set_default_font(&[assets::QUICKSAND]);
 
             data.clone().build(cx);
-
-            let (lattice_width_pixels, lattice_height_pixels) = (
-                lattice_width_pixels(data.params.grid_params.width.load(Ordering::Relaxed)),
-                lattice_height_pixels(data.params.grid_params.height.load(Ordering::Relaxed)),
-            );
 
             HStack::new(cx, |cx| {
                 let button_dimensions = BOTTOM_REGION_HEIGHT - PADDING * 2.0;
