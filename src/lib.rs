@@ -1,7 +1,7 @@
 use crate::midi::DisplayNoteEvent;
-use crate::midi::{Voice, VoiceKey};
+use crate::midi::{MidiVoice, VoiceKey};
 use heapless::FnvIndexMap;
-use midi::update_voices;
+use midi::update_midi_voices;
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
 use tuning::*;
@@ -17,7 +17,7 @@ mod editor;
 mod midi;
 mod tuning;
 
-type Voices = FnvIndexMap<VoiceKey, Voice, 256>;
+type Voices = FnvIndexMap<VoiceKey, MidiVoice, 256>;
 
 struct MidiLattice {
     params: Arc<MidiLatticeParams>,
@@ -245,9 +245,9 @@ impl Plugin for MidiLattice {
         let mut event_counter = 0;
 
         while let Some(event) = context.next_event() {
-            update_voices(&mut self.voices, event);
+            update_midi_voices(&mut self.voices, event);
 
-            nih_log!("event: {}", DisplayNoteEvent(event));
+            //nih_log!("event: {}", DisplayNoteEvent(event));
             context.send_event(event);
 
             event_counter += 1;
@@ -255,10 +255,10 @@ impl Plugin for MidiLattice {
 
         if event_counter > 0 {
             self.voices_input.write(self.voices.clone());
-            /*
+
             for v in self.voices.values() {
                 nih_log!("--- voice: {}", v);
-            }*/
+            }
             /*
             nih_log!(
                 "*** process() finished in {} us with {} events",

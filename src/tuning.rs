@@ -23,7 +23,7 @@ pub const SEVEN_JUST: PitchClass = PitchClass::from_microcents(968_825_906);
 
 pub const CENTS_TO_MICROCENTS: u32 = 1_000_000;
 const MIDI_NOTE_TO_CENTS: u32 = 100;
-const OCTAVE_MICROCENTS: u32 = 1_200 * CENTS_TO_MICROCENTS;
+pub const OCTAVE_MICROCENTS: u32 = 1_200 * CENTS_TO_MICROCENTS;
 
 const MIDI_NOTE_TO_CENTS_F32: f32 = MIDI_NOTE_TO_CENTS as f32;
 const CENTS_TO_MICROCENTS_F32: f32 = CENTS_TO_MICROCENTS as f32;
@@ -68,6 +68,17 @@ impl PitchClass {
         self.0 / CENTS_TO_MICROCENTS
     }
 
+    /// Creates a pitch class from a number of microcents.
+    ///
+    /// # Examples
+    /// ```
+    /// // A pitch class representing the 12-TET semitone
+    /// PitchClass::from_microcents(100_000_000)
+    /// // A pitch class representing the 12-TET major seventh
+    /// PitchClass::from_microcents(1100_000_000)
+    /// // A pitch class representing (almost) the justly tuned perfect fifth
+    /// PitchClass::from_microcents(701_995_001)
+    /// ```
     pub const fn from_microcents(microcents: u32) -> Self {
         PitchClass(microcents % OCTAVE_MICROCENTS)
     }
@@ -139,6 +150,12 @@ impl Sub<PitchClass> for PitchClass {
     type Output = Self;
     fn sub(self, other: PitchClass) -> PitchClass {
         self + -other
+    }
+}
+
+impl From<PitchClassDistance> for PitchClass {
+    fn from(pc_distance: PitchClassDistance) -> Self {
+        PitchClass::from_microcents(pc_distance.0)
     }
 }
 

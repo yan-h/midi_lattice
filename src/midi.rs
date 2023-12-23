@@ -10,26 +10,22 @@ use std::fmt::Display;
 use crate::tuning::PitchClass;
 use crate::Voices;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct Voice {
+#[derive(Debug, PartialEq, Clone, Copy, PartialOrd, Ord, Eq)]
+pub struct MidiVoice {
     voice_id: Option<i32>,
     channel: u8,
     note: u8,
-    // Pitch in semitones
-    pitch: f32,
     pitch_class: PitchClass,
 }
 
-impl Eq for Voice {}
-
-impl Hash for Voice {
+impl Hash for MidiVoice {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.note.hash(state);
         self.channel.hash(state);
     }
 }
 
-impl hash32::Hash for Voice {
+impl hash32::Hash for MidiVoice {
     fn hash<H>(&self, state: &mut H)
     where
         H: hash32::Hasher,
@@ -39,19 +35,21 @@ impl hash32::Hash for Voice {
     }
 }
 
-impl Voice {
-    fn new(voice_id: Option<i32>, channel: u8, note: u8) -> Self {
-        Voice {
+impl MidiVoice {
+    pub fn new(voice_id: Option<i32>, channel: u8, note: u8, pitch_class: PitchClass) -> Self {
+        MidiVoice {
             voice_id,
             channel,
             note,
-            pitch: note as f32,
-            pitch_class: PitchClass::from_midi_note(note),
+            pitch_class,
         }
     }
 
+    pub fn from_midi_data(voice_id: Option<i32>, channel: u8, note: u8) -> Self {
+        Self::new(voice_id, channel, note, PitchClass::from_midi_note(note))
+    }
+
     fn set_tuning(&mut self, tuning_offset: f32) {
-        self.pitch = (self.note as f32) + tuning_offset;
         self.pitch_class = PitchClass::from_midi_note(self.note)
             + PitchClass::from_midi_note_offset_f32(tuning_offset);
     }
@@ -65,12 +63,12 @@ impl Voice {
     }
 }
 
-impl Display for Voice {
+impl Display for MidiVoice {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{{ note {}, ch {}, pitch {:.9}, pitch class {} }}",
-            self.note, self.channel, self.pitch, self.pitch_class
+            "{{ note {}, ch {}, pitch class {} }}",
+            self.note, self.channel, self.pitch_class
         )
     }
 }
@@ -128,7 +126,7 @@ impl Display for DisplayNoteEvent {
     }
 }
 
-pub fn update_voices(voices: &mut Voices, event: NoteEvent<()>) {
+pub fn update_midi_voices(voices: &mut Voices, event: NoteEvent<()>) {
     match event {
         NoteEvent::NoteOn {
             timing: _,
@@ -139,7 +137,7 @@ pub fn update_voices(voices: &mut Voices, event: NoteEvent<()>) {
         } => {
             match voices.insert(
                 VoiceKey { note, channel },
-                Voice::new(voice_id, channel, note),
+                MidiVoice::from_midi_data(voice_id, channel, note),
             ) {
                 Ok(Some(_)) => {
                     nih_error!(
@@ -175,7 +173,7 @@ pub fn update_voices(voices: &mut Voices, event: NoteEvent<()>) {
             note,
             tuning,
         } => {
-            let cur_voice: Option<&mut Voice> = voices.get_mut(&VoiceKey { channel, note });
+            let cur_voice: Option<&mut MidiVoice> = voices.get_mut(&VoiceKey { channel, note });
             match cur_voice {
                 None => {
                     nih_log!(

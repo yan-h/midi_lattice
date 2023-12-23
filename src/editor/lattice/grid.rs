@@ -5,7 +5,7 @@ use crate::assets;
 use crate::editor::make_icon_paint;
 use crate::editor::COLOR_0;
 use crate::editor::COLOR_2_HIGHLIGHT;
-use crate::midi::Voice;
+use crate::midi::MidiVoice;
 use crate::tuning;
 use crate::tuning::NoteNameInfo;
 use crate::tuning::PitchClass;
@@ -42,6 +42,29 @@ pub struct Grid {
 
     // Need interior mutability to allow mutation from draw()
     animation_info: Mutex<AnimationInfo>,
+}
+
+/// All the information relevant to displaying voices on a grid. A simplified version of
+/// `MidiVoice`
+#[derive(Debug, PartialEq, Clone, Copy, PartialOrd, Ord, Eq)]
+pub struct Voice {
+    channel: u8,
+    pitch_class: PitchClass,
+}
+
+impl Voice {
+    const fn new(channel: u8, pitch_class: PitchClass) -> Self {
+        Voice {
+            channel,
+            pitch_class,
+        }
+    }
+    const fn get_pitch_class(&self) -> PitchClass {
+        self.pitch_class
+    }
+    const fn get_channel(&self) -> u8 {
+        self.channel
+    }
 }
 
 /// Additional state for displaying things that aren't captured by the current voices
@@ -251,7 +274,6 @@ struct DrawNodeArgs {
     draw_node_x: f32,
     draw_node_y: f32,
     base_z: i32,
-    matching_voices: Vec<Voice>,
     pitch_class: PitchClass,
     note_name_info: NoteNameInfo,
     colors: Vec<vg::Color>,
@@ -282,6 +304,14 @@ impl DrawNodeArgs {
 
         let matching_voices =
             get_matching_voices(pitch_class, &args.sorted_voices, args.tuning_tolerance);
+        if pitch_class.distance_to(PitchClass::from_microcents(1199_000_000))
+            < PitchClassDistance::from_microcents(5_000_000)
+        {
+            nih_dbg!(pitch_class);
+            nih_dbg!(&args.sorted_voices);
+            nih_dbg!(args.tuning_tolerance);
+            nih_log!("====");
+        }
 
         let highlighted = has_matching_pitch_class(
             pitch_class,
@@ -323,7 +353,6 @@ impl DrawNodeArgs {
             draw_node_y,
             base_z,
             pitch_class,
-            matching_voices,
             note_name_info,
             colors,
             draw_outline: channels[15],
@@ -1014,13 +1043,18 @@ impl View for Grid {
 }
 // Helper methods for drawing
 impl Grid {
-    /// Retrieves the list of voices from the triple buffer, and returns a vector of them
+    /// Retrieves the list of `MidiVoice` from the triple buffer, and returns a vector of `Voice`
     /// sorted by pitch class.
     fn get_sorted_voices(&self) -> Vec<Voice> {
         let mut voices_output = self.voices_output.lock().unwrap();
-        let mut sorted_voices: Vec<Voice> = voices_output.read().values().cloned().collect();
-        sorted_voices.sort_unstable_by(|v1, v2| v1.get_pitch_class().cmp(&v2.get_pitch_class()));
-        sorted_voices
+        let mut result: Vec<Voice> = voices_output
+            .read()
+            .values()
+            .cloned()
+            .map(|v: MidiVoice| Voice::new(v.get_channel(), v.get_pitch_class()))
+            .collect();
+        result.sort_unstable_by(|v1, v2| v1.pitch_class.cmp(&v2.pitch_class));
+        result
     }
 }
 
@@ -1063,15 +1097,15 @@ fn get_matching_voices(
         return matching_voices;
     }
 
-    // Start at the first voice whose pitch class is greater than or equal to the node's
-    let start_idx: usize = sorted_voices.partition_point(|v| {
-        v.get_pitch_class() < pitch_class
-            && v.get_pitch_class().distance_to(pitch_class) > tuning_tolerance
+    // First pitch that could match
+    let mut start_idx: usize = sorted_voices.partition_point(|v| {
+        v.get_pitch_class() < pitch_class - PitchClass::from(tuning_tolerance)
     });
 
     if start_idx == sorted_voices.len() {
-        return matching_voices;
+        start_idx = 0;
     }
+    dbg!(start_idx);
 
     let mut idx = start_idx;
 
@@ -1114,4 +1148,103 @@ fn get_matching_voices(
     }
 
     matching_voices
+}
+
+#[cfg(test)]
+mod get_matching_voices_tests {
+    use crate::{
+        editor::lattice::grid::{get_matching_voices, Voice},
+        tuning::{PitchClass, PitchClassDistance, OCTAVE_MICROCENTS},
+    };
+
+    #[test]
+    fn matches_distance_less_than_or_equal_to_tolerance() {
+        let mut output = get_matching_voices(
+            PitchClass::from_microcents(100_000_000),
+            &vec![
+                Voice::new(0, PitchClass::from_microcents(98_999_999)),
+                Voice::new(0, PitchClass::from_microcents(99_000_000)),
+                Voice::new(0, PitchClass::from_microcents(101_000_000)),
+                Voice::new(0, PitchClass::from_microcents(101_000_001)),
+            ],
+            PitchClassDistance::from_microcents(1_000_000),
+        );
+        output.sort();
+        let mut target = vec![
+            Voice::new(0, PitchClass::from_microcents(99_000_000)),
+            Voice::new(0, PitchClass::from_microcents(101_000_000)),
+        ];
+        target.sort();
+        assert_eq!(output, target);
+    }
+
+    #[test]
+    fn slightly_positive_matches_slightly_negative() {
+        let output = get_matching_voices(
+            PitchClass::from_microcents(123),
+            &vec![Voice::new(
+                0,
+                PitchClass::from_microcents(OCTAVE_MICROCENTS - 123),
+            )],
+            PitchClassDistance::from_microcents(246),
+        );
+        let target = vec![Voice::new(
+            0,
+            PitchClass::from_microcents(OCTAVE_MICROCENTS - 123),
+        )];
+        assert_eq!(output, target);
+    }
+
+    #[test]
+    fn slightly_negative_matches_slightly_positive() {
+        let output = get_matching_voices(
+            PitchClass::from_microcents(OCTAVE_MICROCENTS - 123),
+            &vec![Voice::new(0, PitchClass::from_microcents(123))],
+            PitchClassDistance::from_microcents(246),
+        );
+        let target = vec![Voice::new(0, PitchClass::from_microcents(123))];
+        assert_eq!(output, target);
+    }
+
+    #[test]
+    fn slightly_positive_matches_slightly_negative_multiple_voices() {
+        let mut output = get_matching_voices(
+            PitchClass::from_microcents(123),
+            &vec![
+                Voice::new(0, PitchClass::from_microcents(123)),
+                Voice::new(0, PitchClass::from_microcents(700_000_000)),
+                Voice::new(0, PitchClass::from_microcents(1100_000_000)),
+                Voice::new(0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
+            ],
+            PitchClassDistance::from_microcents(246),
+        );
+        output.sort();
+        let mut target = vec![
+            Voice::new(0, PitchClass::from_microcents(123)),
+            Voice::new(0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
+        ];
+        target.sort();
+        assert_eq!(output, target);
+    }
+
+    #[test]
+    fn slightly_negative_matches_slightly_positive_multiple_voices() {
+        let mut output = get_matching_voices(
+            PitchClass::from_microcents(OCTAVE_MICROCENTS - 123),
+            &vec![
+                Voice::new(0, PitchClass::from_microcents(123)),
+                Voice::new(0, PitchClass::from_microcents(700_000_000)),
+                Voice::new(0, PitchClass::from_microcents(1100_000_000)),
+                Voice::new(0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
+            ],
+            PitchClassDistance::from_microcents(246),
+        );
+        output.sort();
+        let mut target = vec![
+            Voice::new(0, PitchClass::from_microcents(123)),
+            Voice::new(0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
+        ];
+        target.sort();
+        assert_eq!(output, target);
+    }
 }
