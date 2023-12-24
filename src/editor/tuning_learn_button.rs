@@ -120,7 +120,7 @@ impl View for TuningLearnButton {
 }
 
 // How close an interval needs to be to its just interval to be autodetected
-const LEARN_RANGE: PitchClassDistance = PitchClassDistance::from_cents(20);
+const LEARN_RANGE: PitchClassDistance = PitchClassDistance::from_cents(40);
 
 impl TuningLearnButton {
     /// Tunes primes 3, 5, and 7 to the best approximation among the current sounding pitch classes.

@@ -1,4 +1,5 @@
 use crate::MidiLatticeParams;
+use crate::ShowZAxis;
 use crate::Voices;
 
 use crate::assets;
@@ -220,6 +221,7 @@ struct DrawGridArgs {
     grid_x: f32,
     grid_y: f32,
     grid_z: i32,
+    show_z_axis: ShowZAxis,
     sorted_voices: Vec<Voice>,
     three_tuning: PitchClass,
     five_tuning: PitchClass,
@@ -255,6 +257,7 @@ impl DrawGridArgs {
             grid_x: grid.params.grid_params.x.value(),
             grid_y: grid.params.grid_params.y.value(),
             grid_z: grid.params.grid_params.z.value(),
+            show_z_axis: grid.params.grid_params.show_z_axis.value(),
             sorted_voices,
             three_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.three.value()),
             five_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.five.value()),
@@ -337,12 +340,26 @@ impl DrawNodeArgs {
         }
 
         let draw = match base_z {
+            // Always draw main nodes
             0 => true,
+            // Nodes that aren't at zero on the Z axis have additional logic
             -1 | 1 => {
-                let dependent_seven = (args.three_tuning.multiply(-2))
-                    .distance_to(args.seven_tuning)
-                    <= args.tuning_tolerance;
-                !dependent_seven && (matching_voices.len() != 0 || highlighted)
+                if matching_voices.len() != 0 || highlighted {
+                    match args.show_z_axis {
+                        ShowZAxis::Yes => true,
+                        ShowZAxis::No => false,
+                        ShowZAxis::Auto => {
+                            // Whether the seventh harmonic is equal to the meantone minor seventh
+                            // i.e. whether it's equal to two perfect fourths
+                            let dependent_seven = (args.three_tuning.multiply(-2))
+                                .distance_to(args.seven_tuning)
+                                <= args.tuning_tolerance;
+                            !dependent_seven
+                        }
+                    }
+                } else {
+                    false
+                }
             }
             _ => false,
         };

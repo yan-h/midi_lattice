@@ -64,6 +64,16 @@ pub struct GridParams {
 
     #[id = "highlight-time"]
     pub highlight_time: FloatParam,
+
+    #[id = "display-z-axis"]
+    pub show_z_axis: EnumParam<ShowZAxis>,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Enum)]
+pub enum ShowZAxis {
+    Yes,
+    Auto,
+    No,
 }
 
 const MAX_GRID_OFFSET: f32 = 20.0;
@@ -106,6 +116,7 @@ impl Default for GridParams {
                     factor: FloatRange::skew_factor(-2.0),
                 },
             ),
+            show_z_axis: EnumParam::new("Show Z axis", ShowZAxis::Auto),
         }
     }
 }
