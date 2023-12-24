@@ -1085,21 +1085,73 @@ fn has_matching_pitch_class(
         return false;
     }
 
-    let first_greater_idx: usize = sorted_pitch_classes.partition_point(|pc| pc < &pitch_class);
-    if first_greater_idx == sorted_pitch_classes.len() {
-        return sorted_pitch_classes[first_greater_idx - 1].distance_to(pitch_class)
-            <= tuning_tolerance;
-    }
-    if sorted_pitch_classes[first_greater_idx].distance_to(pitch_class) <= tuning_tolerance {
-        return true;
+    // Lowest pitch class that could match
+    let candidate_idx: usize = sorted_pitch_classes
+        .partition_point(|pc: &PitchClass| *pc < pitch_class - PitchClass::from(tuning_tolerance));
+
+    if candidate_idx == sorted_pitch_classes.len() {
+        return sorted_pitch_classes[0].distance_to(pitch_class) <= tuning_tolerance;
     }
 
-    let last_lesser_idx: usize = if first_greater_idx > 0 {
-        first_greater_idx - 1
-    } else {
-        sorted_pitch_classes.len() - 1
+    return sorted_pitch_classes[candidate_idx].distance_to(pitch_class) <= tuning_tolerance;
+}
+
+#[cfg(test)]
+mod has_matching_pitch_class_tests {
+    use crate::{
+        editor::lattice::grid::has_matching_pitch_class,
+        tuning::{PitchClass, PitchClassDistance, OCTAVE_MICROCENTS},
     };
-    sorted_pitch_classes[last_lesser_idx].distance_to(pitch_class) <= tuning_tolerance
+
+    #[test]
+    fn matches_distance_less_than_or_equal_to_tolerance() {
+        assert!(has_matching_pitch_class(
+            PitchClass::from_microcents(700_000_000),
+            &vec![PitchClass::from_microcents(701_000_000)],
+            PitchClassDistance::from_microcents(1_000_000)
+        ));
+        assert!(!has_matching_pitch_class(
+            PitchClass::from_microcents(700_000_000),
+            &vec![PitchClass::from_microcents(701_000_001)],
+            PitchClassDistance::from_microcents(1_000_000)
+        ));
+    }
+
+    #[test]
+    fn matches_across_zero() {
+        assert!(has_matching_pitch_class(
+            PitchClass::from_microcents(0),
+            &vec![PitchClass::from_microcents(OCTAVE_MICROCENTS - 1)],
+            PitchClassDistance::from_microcents(100)
+        ));
+        assert!(has_matching_pitch_class(
+            PitchClass::from_microcents(OCTAVE_MICROCENTS - 1),
+            &vec![PitchClass::from_microcents(1)],
+            PitchClassDistance::from_microcents(100)
+        ));
+    }
+
+    #[test]
+    fn matches_across_zero_many_elements() {
+        assert!(has_matching_pitch_class(
+            PitchClass::from_microcents(0),
+            &vec![
+                PitchClass::from_microcents(400_000_000),
+                PitchClass::from_microcents(700_000_000),
+                PitchClass::from_microcents(OCTAVE_MICROCENTS - 1)
+            ],
+            PitchClassDistance::from_microcents(100)
+        ));
+        assert!(has_matching_pitch_class(
+            PitchClass::from_microcents(OCTAVE_MICROCENTS - 1),
+            &vec![
+                PitchClass::from_microcents(1),
+                PitchClass::from_microcents(400_000_000),
+                PitchClass::from_microcents(700_000_000),
+            ],
+            PitchClassDistance::from_microcents(100)
+        ));
+    }
 }
 
 /// Returns the subset of a vector of voices with a given pitch class.
@@ -1114,7 +1166,7 @@ fn get_matching_voices(
         return matching_voices;
     }
 
-    // First pitch that could match
+    // Lowest pitch class that could match
     let mut start_idx: usize = sorted_voices.partition_point(|v| {
         v.get_pitch_class() < pitch_class - PitchClass::from(tuning_tolerance)
     });
