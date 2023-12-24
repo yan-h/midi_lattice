@@ -122,13 +122,15 @@ impl View for TuningLearnButton {
 // How close an interval needs to be to its just interval to be autodetected
 const LEARN_RANGE: PitchClassDistance = PitchClassDistance::from_cents(40);
 
+const DEFAULT_C: PitchClass = PitchClass::from_microcents(0);
+const TUNE_C_TOLERANCE: PitchClassDistance =
+    PitchClassDistance::from_microcents(50 * CENTS_TO_MICROCENTS);
+
 impl TuningLearnButton {
-    /// Tunes primes 3, 5, and 7 to the best approximation among the current sounding pitch classes.
-    /// Only considers approximations within [`LEARN_RANGE`] cents of the true interval.
+    /// Attempts to tune C; and primes 3, 5, and 7; based on the sounding pitch classes
     fn learn_tuning(&self, cx: &mut EventContext) {
         let mut voices_output = self.voices_output.lock().unwrap();
 
-        nih_dbg!(&voices_output.read());
         let mut pitch_classes: Vec<PitchClass> = voices_output
             .read()
             .values()
@@ -138,6 +140,53 @@ impl TuningLearnButton {
         pitch_classes.sort_unstable();
         pitch_classes.dedup();
 
+        self.learn_c_tuning(cx, &pitch_classes);
+        self.learn_intervals_tuning(cx, &pitch_classes);
+    }
+
+    /// Tunes C to the best approximation present in the given list of pitch classes.
+    /// Only pitch classes within 50 cents of C in MIDI (~262 Hz) are considered
+    fn learn_c_tuning(&self, cx: &mut EventContext, sorted_pitch_classes: &Vec<PitchClass>) {
+        // Tune C
+        let mut best_c: Option<PitchClass> = None;
+        for pitch_class in sorted_pitch_classes {
+            if pitch_class.distance_to(DEFAULT_C) <= TUNE_C_TOLERANCE {
+                best_c = match best_c {
+                    None => Some(*pitch_class),
+                    Some(c) => Some(
+                        if c.distance_to(DEFAULT_C) < pitch_class.distance_to(DEFAULT_C) {
+                            c
+                        } else {
+                            *pitch_class
+                        },
+                    ),
+                };
+            }
+        }
+        best_c.map(|new_c| {
+            let c_cents: f32 = new_c.to_cents_f32();
+            let zero_centered_c_cents: f32 = if c_cents > 600.0 {
+                c_cents - 1200.0
+            } else {
+                c_cents
+            };
+            cx.emit(ParamEvent::BeginSetParameter(&self.tuning_params.c_offset).upcast());
+            cx.emit(
+                ParamEvent::SetParameter(&self.tuning_params.c_offset, zero_centered_c_cents)
+                    .upcast(),
+            );
+            cx.emit(ParamEvent::EndSetParameter(&self.tuning_params.c_offset).upcast());
+        });
+    }
+
+    /// Tunes primes 3, 5, and 7 to the best approximation among the current sounding pitch classes.
+    /// Only considers approximations within [`LEARN_RANGE`] cents of the true interval.
+    fn learn_intervals_tuning(
+        &self,
+        cx: &mut EventContext,
+        sorted_pitch_classes: &Vec<PitchClass>,
+    ) {
+        // Tune intervals
         let mut best_three: Option<PitchClass> = None;
         let mut best_five: Option<PitchClass> = None;
         let mut best_seven: Option<PitchClass> = None;
@@ -159,7 +208,7 @@ impl TuningLearnButton {
                 }
             };
 
-        let mut i = pitch_classes.iter();
+        let mut i = sorted_pitch_classes.iter();
         while let Some(pc_a) = i.next() {
             let mut j = i.clone();
             while let Some(pc_b) = j.next() {

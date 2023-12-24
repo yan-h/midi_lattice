@@ -223,6 +223,7 @@ struct DrawGridArgs {
     grid_z: i32,
     show_z_axis: ShowZAxis,
     sorted_voices: Vec<Voice>,
+    c_offset: PitchClass,
     three_tuning: PitchClass,
     five_tuning: PitchClass,
     seven_tuning: PitchClass,
@@ -259,6 +260,7 @@ impl DrawGridArgs {
             grid_z: grid.params.grid_params.z.value(),
             show_z_axis: grid.params.grid_params.show_z_axis.value(),
             sorted_voices,
+            c_offset: PitchClass::from_cents_f32(grid.params.tuning_params.c_offset.value()),
             three_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.three.value()),
             five_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.five.value()),
             seven_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.seven.value()),
@@ -303,18 +305,11 @@ impl DrawNodeArgs {
 
         // Pitch class represented by this node
         let pitch_class: PitchClass =
-            primes.pitch_class(args.three_tuning, args.five_tuning, args.seven_tuning);
+            primes.pitch_class(args.three_tuning, args.five_tuning, args.seven_tuning)
+                + args.c_offset;
 
         let matching_voices =
             get_matching_voices(pitch_class, &args.sorted_voices, args.tuning_tolerance);
-        if pitch_class.distance_to(PitchClass::from_microcents(1199_000_000))
-            < PitchClassDistance::from_microcents(5_000_000)
-        {
-            nih_dbg!(pitch_class);
-            nih_dbg!(&args.sorted_voices);
-            nih_dbg!(args.tuning_tolerance);
-            nih_log!("====");
-        }
 
         let highlighted = has_matching_pitch_class(
             pitch_class,

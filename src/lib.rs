@@ -116,7 +116,7 @@ impl Default for GridParams {
                     factor: FloatRange::skew_factor(-2.0),
                 },
             ),
-            show_z_axis: EnumParam::new("Show Z axis", ShowZAxis::Auto),
+            show_z_axis: EnumParam::new("Show Z Axis", ShowZAxis::Auto),
         }
     }
 }
@@ -124,6 +124,9 @@ impl Default for GridParams {
 /// Tuning information for each prime harmonic, in cents
 #[derive(Params)]
 pub struct TuningParams {
+    #[id = "tuning-c-offset"]
+    c_offset: FloatParam,
+
     #[id = "tuning-three"]
     three: FloatParam,
 
@@ -143,6 +146,14 @@ const MAX_TUNING_OFFSET: f32 = 40.0;
 impl Default for TuningParams {
     fn default() -> Self {
         Self {
+            c_offset: FloatParam::new(
+                "C Tuning Offset (cents)",
+                0.0,
+                FloatRange::Linear {
+                    min: -600.0,
+                    max: 600.0,
+                },
+            ),
             three: FloatParam::new(
                 "Perfect Fifth (cents)",
                 THREE_12TET_F32,
