@@ -222,7 +222,7 @@ static CHANNEL_COLORS: Lazy<[vg::Color; 9]> = Lazy::new(|| {
         Lch::new(60.0, 40.0, 280.0), // 5 blue
         Lch::new(50.0, 55.0, 305.0), // 6 purple
         Lch::new(70.0, 30.0, 340.0), // 7 pink
-        Lch::new(100.0, 0.0, 0.0),   // 8 white
+        Lch::new(80.0, 0.0, 0.0),    // 8 white
         Lch::new(0.0, 0.0, 0.0),     // 9 black
                                      // 10-15 are colored based on pitch
                                      // 16 is just an outline
