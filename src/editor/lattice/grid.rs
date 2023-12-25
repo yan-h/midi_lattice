@@ -1,4 +1,5 @@
 use crate::MidiLatticeParams;
+use crate::NoteColorScheme;
 use crate::ShowZAxis;
 use crate::Voices;
 
@@ -47,24 +48,51 @@ pub struct Grid {
 
 /// All the information relevant to displaying voices on a grid. A simplified version of
 /// `MidiVoice`
-#[derive(Debug, PartialEq, Clone, Copy, PartialOrd, Ord, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub struct Voice {
-    channel: u8,
     pitch_class: PitchClass,
+    pitch: f32,
+    channel: u8,
 }
 
 impl Voice {
-    const fn new(channel: u8, pitch_class: PitchClass) -> Self {
+    const fn new(channel: u8, pitch: f32, pitch_class: PitchClass) -> Self {
         Voice {
-            channel,
             pitch_class,
+            pitch,
+            channel,
         }
     }
+
     const fn get_pitch_class(&self) -> PitchClass {
         self.pitch_class
     }
+
+    const fn get_pitch(&self) -> f32 {
+        self.pitch
+    }
+
     const fn get_channel(&self) -> u8 {
         self.channel
+    }
+}
+
+impl PartialEq for Voice {
+    fn eq(&self, other: &Self) -> bool {
+        self.pitch_class == other.pitch_class
+    }
+}
+impl Eq for Voice {}
+
+impl PartialOrd for Voice {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.pitch_class.partial_cmp(&other.pitch_class)
+    }
+}
+
+impl Ord for Voice {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.pitch_class.cmp(&other.pitch_class)
     }
 }
 
@@ -185,7 +213,7 @@ fn lch_to_vg_color(lch_color: Lch) -> vg::Color {
     )
 }
 
-static CHANNEL_COLORS: Lazy<[vg::Color; 15]> = Lazy::new(|| {
+static CHANNEL_COLORS: Lazy<[vg::Color; 9]> = Lazy::new(|| {
     [
         Lch::new(50.0, 45.0, 35.0),  // 1 red
         Lch::new(65.0, 55.0, 70.0),  // 2 orange
@@ -194,16 +222,10 @@ static CHANNEL_COLORS: Lazy<[vg::Color; 15]> = Lazy::new(|| {
         Lch::new(60.0, 40.0, 280.0), // 5 blue
         Lch::new(50.0, 55.0, 305.0), // 6 purple
         Lch::new(70.0, 30.0, 340.0), // 7 pink
-        // TODO: make 8-14 different from 1-7
-        Lch::new(50.0, 45.0, 35.0),  // 8 red
-        Lch::new(65.0, 55.0, 70.0),  // 9 orange
-        Lch::new(75.0, 60.0, 90.0),  // 10 yellow
-        Lch::new(65.0, 50.0, 120.0), // 11 green
-        Lch::new(60.0, 40.0, 280.0), // 12 blue
-        Lch::new(50.0, 55.0, 305.0), // 13 purple
-        Lch::new(70.0, 30.0, 340.0), // 14 pink
-        Lch::new(0.0, 0.0, 35.0),    // 15 black, because why not
-                                     // 16 is just an outline, so it has no entry here
+        Lch::new(100.0, 0.0, 0.0),   // 8 white
+        Lch::new(0.0, 0.0, 0.0),     // 9 black
+                                     // 10-15 are colored based on pitch
+                                     // 16 is just an outline
     ]
     .map(|x| lch_to_vg_color(x))
 });
@@ -222,6 +244,8 @@ struct DrawGridArgs {
     grid_y: f32,
     grid_z: i32,
     show_z_axis: ShowZAxis,
+    darkest_pitch: f32,
+    brightest_pitch: f32,
     sorted_voices: Vec<Voice>,
     c_offset: PitchClass,
     three_tuning: PitchClass,
@@ -259,6 +283,8 @@ impl DrawGridArgs {
             grid_y: grid.params.grid_params.y.value(),
             grid_z: grid.params.grid_params.z.value(),
             show_z_axis: grid.params.grid_params.show_z_axis.value(),
+            darkest_pitch: grid.params.grid_params.darkest_pitch.value(),
+            brightest_pitch: grid.params.grid_params.brightest_pitch.value(),
             sorted_voices,
             c_offset: PitchClass::from_cents_f32(grid.params.tuning_params.c_offset.value()),
             three_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.three.value()),
@@ -319,18 +345,30 @@ impl DrawNodeArgs {
 
         let note_name_info = primes.note_name_info();
 
-        // Voices whose pitch class matches this node's pitch class
-        // In comments, we'll use 0-indexed channels to match the code. So 15 is the max.
-        let mut channels: [bool; 16] = [false; 16];
-        for v in &matching_voices {
-            channels[v.get_channel() as usize] = true;
-        }
-
-        // channel 15 determines whether an outline is drawn, so we only go up to 14 here
+        // Determine colors and outline
         let mut colors: Vec<vg::Color> = Vec::with_capacity(15);
-        for channel_num in 0..CHANNEL_COLORS.len() {
-            if channels[channel_num] {
-                colors.push(CHANNEL_COLORS[channel_num]);
+        let mut draw_outline = false;
+        for v in &matching_voices {
+            if v.get_channel() < 9 {
+                // These channels have a fixed color
+                colors.push(CHANNEL_COLORS[usize::from(v.get_channel())]);
+            } else if v.get_channel() < 15 {
+                // These channels are colored by pitch, on a gradient
+                let pitch_color_index: f64 = ((v
+                    .get_pitch()
+                    .min(args.brightest_pitch)
+                    .max(args.darkest_pitch)
+                    - args.darkest_pitch)
+                    / (args.brightest_pitch - args.darkest_pitch).max(0.01))
+                    as f64;
+                colors.push(lch_to_vg_color(Lch::new(
+                    25.0 + pitch_color_index * 55.0,
+                    65.0 - pitch_color_index * 35.0,
+                    (-20.0 + pitch_color_index * 110.0).rem_euclid(360.0),
+                )));
+            } else if v.get_channel() == 15 {
+                // The last channel only controls whether the note is outlined
+                draw_outline = true;
             }
         }
 
@@ -367,7 +405,7 @@ impl DrawNodeArgs {
             pitch_class,
             note_name_info,
             colors,
-            draw_outline: channels[15],
+            draw_outline,
             outline_width: args.scaled_padding * OUTLINE_PADDING_RATIO,
             highlighted,
         }
@@ -1063,7 +1101,7 @@ impl Grid {
             .read()
             .values()
             .cloned()
-            .map(|v: MidiVoice| Voice::new(v.get_channel(), v.get_pitch_class()))
+            .map(|v: MidiVoice| Voice::new(v.get_channel(), v.get_pitch(), v.get_pitch_class()))
             .collect();
         result.sort_unstable_by(|v1, v2| v1.pitch_class.cmp(&v2.pitch_class));
         result
@@ -1169,7 +1207,6 @@ fn get_matching_voices(
     if start_idx == sorted_voices.len() {
         start_idx = 0;
     }
-    dbg!(start_idx);
 
     let mut idx = start_idx;
 
@@ -1226,17 +1263,17 @@ mod get_matching_voices_tests {
         let mut output = get_matching_voices(
             PitchClass::from_microcents(100_000_000),
             &vec![
-                Voice::new(0, PitchClass::from_microcents(98_999_999)),
-                Voice::new(0, PitchClass::from_microcents(99_000_000)),
-                Voice::new(0, PitchClass::from_microcents(101_000_000)),
-                Voice::new(0, PitchClass::from_microcents(101_000_001)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(98_999_999)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(99_000_000)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(101_000_000)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(101_000_001)),
             ],
             PitchClassDistance::from_microcents(1_000_000),
         );
         output.sort();
         let mut target = vec![
-            Voice::new(0, PitchClass::from_microcents(99_000_000)),
-            Voice::new(0, PitchClass::from_microcents(101_000_000)),
+            Voice::new(0, 0.0, PitchClass::from_microcents(99_000_000)),
+            Voice::new(0, 0.0, PitchClass::from_microcents(101_000_000)),
         ];
         target.sort();
         assert_eq!(output, target);
@@ -1248,12 +1285,14 @@ mod get_matching_voices_tests {
             PitchClass::from_microcents(123),
             &vec![Voice::new(
                 0,
+                0.0,
                 PitchClass::from_microcents(OCTAVE_MICROCENTS - 123),
             )],
             PitchClassDistance::from_microcents(246),
         );
         let target = vec![Voice::new(
             0,
+            0.0,
             PitchClass::from_microcents(OCTAVE_MICROCENTS - 123),
         )];
         assert_eq!(output, target);
@@ -1263,10 +1302,10 @@ mod get_matching_voices_tests {
     fn slightly_negative_matches_slightly_positive() {
         let output = get_matching_voices(
             PitchClass::from_microcents(OCTAVE_MICROCENTS - 123),
-            &vec![Voice::new(0, PitchClass::from_microcents(123))],
+            &vec![Voice::new(0, 0.0, PitchClass::from_microcents(123))],
             PitchClassDistance::from_microcents(246),
         );
-        let target = vec![Voice::new(0, PitchClass::from_microcents(123))];
+        let target = vec![Voice::new(0, 0.0, PitchClass::from_microcents(123))];
         assert_eq!(output, target);
     }
 
@@ -1275,17 +1314,17 @@ mod get_matching_voices_tests {
         let mut output = get_matching_voices(
             PitchClass::from_microcents(123),
             &vec![
-                Voice::new(0, PitchClass::from_microcents(123)),
-                Voice::new(0, PitchClass::from_microcents(700_000_000)),
-                Voice::new(0, PitchClass::from_microcents(1100_000_000)),
-                Voice::new(0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(123)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(700_000_000)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(1100_000_000)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
             ],
             PitchClassDistance::from_microcents(246),
         );
         output.sort();
         let mut target = vec![
-            Voice::new(0, PitchClass::from_microcents(123)),
-            Voice::new(0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
+            Voice::new(0, 0.0, PitchClass::from_microcents(123)),
+            Voice::new(0, 0.0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
         ];
         target.sort();
         assert_eq!(output, target);
@@ -1296,17 +1335,17 @@ mod get_matching_voices_tests {
         let mut output = get_matching_voices(
             PitchClass::from_microcents(OCTAVE_MICROCENTS - 123),
             &vec![
-                Voice::new(0, PitchClass::from_microcents(123)),
-                Voice::new(0, PitchClass::from_microcents(700_000_000)),
-                Voice::new(0, PitchClass::from_microcents(1100_000_000)),
-                Voice::new(0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(123)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(700_000_000)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(1100_000_000)),
+                Voice::new(0, 0.0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
             ],
             PitchClassDistance::from_microcents(246),
         );
         output.sort();
         let mut target = vec![
-            Voice::new(0, PitchClass::from_microcents(123)),
-            Voice::new(0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
+            Voice::new(0, 0.0, PitchClass::from_microcents(123)),
+            Voice::new(0, 0.0, PitchClass::from_microcents(OCTAVE_MICROCENTS - 123)),
         ];
         target.sort();
         assert_eq!(output, target);

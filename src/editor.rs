@@ -51,8 +51,8 @@ impl Model for Data {}
 
 pub const MIN_GRID_WIDTH: u8 = 4;
 pub const MIN_GRID_HEIGHT: u8 = 4;
-pub const MAX_GRID_WIDTH: u8 = 12;
-pub const MAX_GRID_HEIGHT: u8 = 12;
+pub const MAX_GRID_WIDTH: u8 = 30;
+pub const MAX_GRID_HEIGHT: u8 = 30;
 
 pub const NON_GRID_HEIGHT: f32 = BOTTOM_REGION_HEIGHT + PADDING;
 pub const NON_GRID_WIDTH: f32 = RIGHT_REGION_WIDTH + PADDING;

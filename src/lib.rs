@@ -62,11 +62,21 @@ pub struct GridParams {
     #[id = "grid-z"]
     pub z: IntParam,
 
+    // How many seconds a note remains highlighted after release
     #[id = "highlight-time"]
     pub highlight_time: FloatParam,
 
+    // Whether to show the Z axis (representing the prime factor 7)
     #[id = "display-z-axis"]
     pub show_z_axis: EnumParam<ShowZAxis>,
+
+    // The pitch with the "darkest" color, on channels colored by pitch
+    #[id = "darkest-pitch"]
+    pub darkest_pitch: FloatParam,
+
+    // The pitch with the "brightest" color, on channels colored by pitch
+    #[id = "brightest-pitch"]
+    pub brightest_pitch: FloatParam,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Enum)]
@@ -74,6 +84,12 @@ pub enum ShowZAxis {
     Yes,
     Auto,
     No,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Enum)]
+pub enum NoteColorScheme {
+    Channel,
+    Pitch,
 }
 
 const MAX_GRID_OFFSET: f32 = 20.0;
@@ -117,6 +133,22 @@ impl Default for GridParams {
                 },
             ),
             show_z_axis: EnumParam::new("Show Z Axis", ShowZAxis::Auto),
+            darkest_pitch: FloatParam::new(
+                "Darkest pitch",
+                30.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 60.0,
+                },
+            ),
+            brightest_pitch: FloatParam::new(
+                "Brightest pitch",
+                90.0,
+                FloatRange::Linear {
+                    min: 60.0,
+                    max: 120.0,
+                },
+            ),
         }
     }
 }
@@ -180,7 +212,7 @@ impl Default for TuningParams {
             ),
             tolerance: FloatParam::new(
                 "Tuning Tolerance (cents)",
-                0.01,
+                0.5,
                 FloatRange::Skewed {
                     min: 0.001,
                     max: 49.999,

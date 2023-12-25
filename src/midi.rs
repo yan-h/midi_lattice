@@ -10,11 +10,12 @@ use std::fmt::Display;
 use crate::tuning::PitchClass;
 use crate::Voices;
 
-#[derive(Debug, PartialEq, Clone, Copy, PartialOrd, Ord, Eq)]
+#[derive(Debug, PartialEq, Clone, Copy, PartialOrd)]
 pub struct MidiVoice {
     voice_id: Option<i32>,
     channel: u8,
     note: u8,
+    pitch: f32,
     pitch_class: PitchClass,
 }
 
@@ -36,22 +37,40 @@ impl hash32::Hash for MidiVoice {
 }
 
 impl MidiVoice {
-    pub fn new(voice_id: Option<i32>, channel: u8, note: u8, pitch_class: PitchClass) -> Self {
+    pub fn new(
+        voice_id: Option<i32>,
+        channel: u8,
+        note: u8,
+        pitch: f32,
+        pitch_class: PitchClass,
+    ) -> Self {
         MidiVoice {
             voice_id,
             channel,
             note,
+            pitch,
             pitch_class,
         }
     }
 
     pub fn from_midi_data(voice_id: Option<i32>, channel: u8, note: u8) -> Self {
-        Self::new(voice_id, channel, note, PitchClass::from_midi_note(note))
+        Self::new(
+            voice_id,
+            channel,
+            note,
+            note as f32,
+            PitchClass::from_midi_note(note),
+        )
     }
 
     fn set_tuning(&mut self, tuning_offset: f32) {
+        self.pitch = self.note as f32 + tuning_offset;
         self.pitch_class = PitchClass::from_midi_note(self.note)
             + PitchClass::from_midi_note_offset_f32(tuning_offset);
+    }
+
+    pub fn get_pitch(&self) -> f32 {
+        self.pitch
     }
 
     pub fn get_pitch_class(&self) -> PitchClass {
@@ -67,8 +86,8 @@ impl Display for MidiVoice {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{{ note {}, ch {}, pitch class {} }}",
-            self.note, self.channel, self.pitch_class
+            "{{ note {}, ch {}, pitch {}, pitch class {} }}",
+            self.note, self.channel, self.pitch, self.pitch_class
         )
     }
 }
