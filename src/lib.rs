@@ -301,7 +301,7 @@ impl Plugin for MidiLattice {
         while let Some(event) = context.next_event() {
             update_midi_voices(&mut self.voices, event);
 
-            //nih_log!("event: {}", DisplayNoteEvent(event));
+            nih_log!("event: {}", DisplayNoteEvent(event));
             context.send_event(event);
 
             event_counter += 1;
@@ -311,7 +311,7 @@ impl Plugin for MidiLattice {
             self.voices_input.write(self.voices.clone());
 
             for v in self.voices.values() {
-                nih_log!("--- voice: {}", v);
+                //nih_log!("--- voice: {}", v);
             }
             /*
             nih_log!(

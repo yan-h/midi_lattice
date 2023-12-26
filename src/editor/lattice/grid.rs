@@ -519,6 +519,19 @@ fn draw_node_zero_z(
     }
 
     fn draw_main_node_square(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
+        // Draw outline for channel 16
+        /*if node_args.draw_outline {
+            let mut outline_path = vg::Path::new();
+            outline_path.rounded_rect(
+                node_args.draw_node_x - node_args.outline_width,
+                node_args.draw_node_y - node_args.outline_width,
+                NODE_SIZE * args.scale + node_args.outline_width * 2.0,
+                NODE_SIZE * args.scale + node_args.outline_width * 2.0,
+                args.scaled_inner_corner_radius + node_args.outline_width,
+            );
+            canvas.fill_path(&mut outline_path, &vg::Paint::color(COLOR_3));
+        }*/
+
         let mut node_path = vg::Path::new();
         node_path.rounded_rect(
             node_args.draw_node_x,
@@ -930,21 +943,13 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
     let mini_node_size: f32 = args.scaled_node_size * MINI_NODE_SIZE_RATIO;
     let (mini_node_x, mini_node_y) = get_mini_node_pos(node_args.base_z == 1, args, node_args);
 
-    let mut background_rect_path = vg::Path::new();
-
-    let mut background_rect_arc_path = vg::Path::new();
-    let mut second_background_rect_arc_path = vg::Path::new();
-
+    // Clear background
     canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
-
+    let mut background_rect_path = vg::Path::new();
     canvas.fill_path(&mut background_rect_path, &vg::Paint::color(COLOR_1));
-
-    let arc_paint = make_icon_paint(COLOR_1, args.scaled_padding);
-    canvas.stroke_path(&mut background_rect_arc_path, &arc_paint);
-    canvas.stroke_path(&mut second_background_rect_arc_path, &arc_paint);
-
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 
+    // Draw background rectangle
     let mut mini_node_path = vg::Path::new();
     mini_node_path.rounded_rect(
         mini_node_x,
@@ -965,13 +970,8 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
             }),
         );
     }
-    if node_args.draw_outline {
-        canvas.stroke_path(
-            &mini_node_path,
-            &make_icon_paint(COLOR_3, node_args.outline_width),
-        );
-    }
 
+    // Draw stripes if needed
     canvas.global_composite_operation(vg::CompositeOperation::Atop);
     draw_extra_colors(
         canvas,
@@ -983,7 +983,15 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
     );
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 
-    // Draw text
+    // Draw outline if needed
+    if node_args.draw_outline {
+        canvas.stroke_path(
+            &mini_node_path,
+            &make_icon_paint(COLOR_3, node_args.outline_width),
+        );
+    }
+
+    // Draw text (first row; whole number cents)
     let mut text_paint = vg::Paint::color(COLOR_3);
     text_paint.set_font_size(args.scaled_node_size * 0.19);
     text_paint.set_text_align(vg::Align::Center);
@@ -995,6 +1003,7 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
         &text_paint,
     );
 
+    // Draw text (second row; fractional cents)
     text_paint.set_font_size(args.scaled_node_size * 0.16);
     let rounded_pitch_class = node_args.pitch_class.round(2);
     let _ = canvas.fill_text(
