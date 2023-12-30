@@ -4,7 +4,7 @@ use crate::editor::lattice::LatticeEvent;
 use crate::editor::*;
 use crate::GridParams;
 
-use nih_plug::prelude::*;
+
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::widgets::ParamEvent;
 use std::sync::Arc;

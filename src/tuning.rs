@@ -5,8 +5,6 @@ use std::{
     ops::{Add, Neg, Sub},
 };
 
-use nih_plug::nih_dbg;
-
 // Just tunings for primes 3, 5, and 7
 pub const THREE_JUST_F32: f32 = 701.955001;
 pub const FIVE_JUST_F32: f32 = 386.313714;
@@ -107,22 +105,22 @@ impl PitchClass {
     pub fn to_cents_f32(self) -> f32 {
         self.0 as f32 / CENTS_TO_MICROCENTS_F32
     }
-
-    pub fn with_midi_tuning_offset(self, offset: f32) -> Self {
-        nih_dbg!(offset);
-        nih_dbg!(
-            self.0
-                + ((offset.rem_euclid(12.0) * MIDI_NOTE_TO_CENTS_F32 * CENTS_TO_MICROCENTS_F32)
-                    .round()) as u32
-        );
-        PitchClass(
-            (self.0
-                + ((offset.rem_euclid(12.0) * MIDI_NOTE_TO_CENTS_F32 * CENTS_TO_MICROCENTS_F32)
-                    .round()) as u32)
-                % OCTAVE_MICROCENTS,
-        )
-    }
-
+    /*
+        pub fn with_midi_tuning_offset(self, offset: f32) -> Self {
+            nih_dbg!(offset);
+            nih_dbg!(
+                self.0
+                    + ((offset.rem_euclid(12.0) * MIDI_NOTE_TO_CENTS_F32 * CENTS_TO_MICROCENTS_F32)
+                        .round()) as u32
+            );
+            PitchClass(
+                (self.0
+                    + ((offset.rem_euclid(12.0) * MIDI_NOTE_TO_CENTS_F32 * CENTS_TO_MICROCENTS_F32)
+                        .round()) as u32)
+                    % OCTAVE_MICROCENTS,
+            )
+        }
+    */
     pub fn multiply(self, rhs: i32) -> PitchClass {
         if rhs >= 0 {
             PitchClass(((rhs as u64 * u64::from(self.0)) % u64::from(OCTAVE_MICROCENTS)) as u32)
@@ -182,10 +180,10 @@ impl PitchClassDistance {
     pub fn from_cents_f32(cents: f32) -> PitchClassDistance {
         Self::from_microcents((cents.rem_euclid(1200.0) * CENTS_TO_MICROCENTS_F32).round() as u32)
     }
-
+    /*
     pub fn scale(&self, factor: u32) -> PitchClassDistance {
         PitchClassDistance(self.0 * factor)
-    }
+    }*/
 }
 
 impl Display for PitchClassDistance {

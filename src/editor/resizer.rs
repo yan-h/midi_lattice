@@ -49,7 +49,7 @@ impl View for Resizer {
     }
 
     fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
-        event.map(|window_event, meta| match *window_event {
+        event.map(|window_event, _meta| match *window_event {
             WindowEvent::MouseDown(MouseButton::Left) => {
                 cx.capture();
                 cx.set_active(true);

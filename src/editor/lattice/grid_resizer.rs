@@ -5,8 +5,8 @@ use crate::editor::width_to_grid_width;
 use crate::editor::*;
 use crate::GridParams;
 
-use nih_plug::prelude::*;
-use nih_plug_vizia::vizia::prelude::*;
+
+
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::widgets::GuiContextEvent;
 use std::sync::atomic::Ordering;

@@ -11,7 +11,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::editor::color::*;
-use crate::editor::{intersects_box, make_icon_stroke_paint, CORNER_RADIUS};
+use crate::editor::{intersects_box, make_icon_stroke_paint};
 
 use super::PADDING;
 

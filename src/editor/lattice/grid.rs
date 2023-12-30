@@ -10,8 +10,8 @@ use crate::tuning::NoteNameInfo;
 use crate::tuning::PitchClass;
 use crate::tuning::PitchClassDistance;
 use crate::tuning::PrimeCountVector;
-use color_space::Lch;
-use color_space::Rgb;
+
+
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::vizia::vg::FontId;
@@ -378,7 +378,7 @@ impl DrawNodeArgs {
     }
 }
 
-fn prepare_canvas(cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs) {
+fn prepare_canvas(_cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs) {
     // Hides everything out of args.bounds - for nodes that stick out when scrolling
     canvas.intersect_scissor(
         args.bounds.x - args.scaled_padding * 0.5,
@@ -403,7 +403,7 @@ fn prepare_canvas(cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 }
 
-fn finish_canvas(cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs) {
+fn finish_canvas(_cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs) {
     // Restore the background rectangle that we removed in prepare_canvas()
     canvas.global_composite_operation(vg::CompositeOperation::DestinationOver);
     let mut background_path_refill = vg::Path::new();
@@ -976,11 +976,11 @@ impl View for Grid {
         Some("lattice-display")
     }
 
-    fn event(&mut self, cx: &mut EventContext, event: &mut Event) {}
+    fn event(&mut self, _cx: &mut EventContext, _event: &mut Event) {}
 
     // TODO: factor this out into methods
     fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
-        let start_time = Instant::now();
+        let _start_time = Instant::now();
 
         let args: DrawGridArgs = DrawGridArgs::new(self, cx, canvas);
 

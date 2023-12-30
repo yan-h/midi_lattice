@@ -1,7 +1,6 @@
 use crate::MidiLatticeParams;
 use crate::Voices;
 
-use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use std::sync::{Arc, Mutex};
@@ -21,8 +20,6 @@ pub mod grid;
 pub mod grid_resizer;
 
 pub struct Lattice {
-    params: Arc<MidiLatticeParams>,
-    voices_output: Arc<Mutex<Output<Voices>>>,
     mouse_over: bool,
 }
 
@@ -36,12 +33,7 @@ impl Lattice {
         LParams: Lens<Target = Arc<MidiLatticeParams>> + Copy,
         LVoices: Lens<Target = Arc<Mutex<Output<Voices>>>>,
     {
-        Self {
-            params: params.get(cx),
-            voices_output: voices_output.get(cx),
-            mouse_over: false,
-        }
-        .build(
+        Self { mouse_over: false }.build(
             cx,
             // This is an otherwise empty element only used for custom drawing
             |cx| {

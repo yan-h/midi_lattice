@@ -1,9 +1,8 @@
 use crate::midi::MidiVoice;
 use crate::GridParams;
-use crate::MidiLatticeParams;
+
 use crate::Voices;
 
-use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use std::sync::{Arc, Mutex};
@@ -12,8 +11,6 @@ use triple_buffer::Output;
 use crate::editor::color::*;
 
 use crate::editor::{CORNER_RADIUS, PADDING};
-
-use super::make_icon_paint;
 
 pub struct NoteSpectrum {
     params: Arc<GridParams>,
@@ -34,7 +31,7 @@ impl NoteSpectrum {
             params: params.get(cx),
             voices_output: voices_output.get(cx),
         }
-        .build(cx, |cx| {})
+        .build(cx, |_cx| {})
     }
 }
 
@@ -43,7 +40,7 @@ impl View for NoteSpectrum {
         Some("lattice")
     }
 
-    fn event(&mut self, cx: &mut EventContext, event: &mut Event) {}
+    fn event(&mut self, _cx: &mut EventContext, _event: &mut Event) {}
 
     fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
         // Background rectangle

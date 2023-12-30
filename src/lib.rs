@@ -294,7 +294,7 @@ impl Plugin for MidiLattice {
         _aux: &mut AuxiliaryBuffers<'_>,
         context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
-        let start_time = Instant::now();
+        let _start_time = Instant::now();
 
         let mut event_counter = 0;
 
@@ -310,7 +310,7 @@ impl Plugin for MidiLattice {
         if event_counter > 0 {
             self.voices_input.write(self.voices.clone());
 
-            for v in self.voices.values() {
+            for _v in self.voices.values() {
                 //nih_log!("--- voice: {}", v);
             }
             /*

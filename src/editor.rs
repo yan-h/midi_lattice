@@ -8,7 +8,6 @@ use crate::editor::resizer::Resizer;
 use crate::editor::tuning_learn_button::TuningLearnButton;
 use crate::MidiLatticeParams;
 use crate::Voices;
-use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::vizia::vg::Paint;
 use std::cmp::{max, min};
@@ -26,7 +25,6 @@ mod color;
 mod lattice;
 mod note_spectrum;
 mod resizer;
-mod scale_button;
 mod tuning_learn_button;
 
 pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.6 + PADDING * 2.0;
