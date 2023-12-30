@@ -1,12 +1,13 @@
 //! A resize handle for uniformly scaling a plugin GUI.
 
-use crate::editor::{intersects_box, COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS, PADDING};
+use crate::editor::{intersects_box, CORNER_RADIUS, PADDING};
 use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 
 use super::make_icon_stroke_paint;
-use super::COLOR_0;
+
+use crate::editor::color::*;
 
 /// A resize handle placed at the bottom right of the window that lets you resize the window.
 ///

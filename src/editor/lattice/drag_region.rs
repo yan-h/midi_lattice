@@ -1,3 +1,4 @@
+use crate::editor::color::*;
 use crate::editor::lattice::grid::NODE_SIZE;
 use crate::editor::lattice::LatticeEvent;
 use crate::editor::*;

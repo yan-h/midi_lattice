@@ -7,7 +7,7 @@ use nih_plug_vizia::vizia::vg;
 use std::sync::{Arc, Mutex};
 use triple_buffer::Output;
 
-use crate::editor::{COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS, PADDING};
+use crate::editor::{CORNER_RADIUS, PADDING};
 
 use self::drag_region::DragRegion;
 use self::grid::Grid;
@@ -15,6 +15,7 @@ use self::grid::NODE_SIZE;
 use self::grid_resizer::GridResizer;
 
 use super::intersects_box;
+use crate::editor::color::COLOR_1;
 mod drag_region;
 pub mod grid;
 pub mod grid_resizer;

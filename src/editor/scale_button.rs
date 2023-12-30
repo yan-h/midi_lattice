@@ -2,6 +2,7 @@ use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 
+use crate::editor::color::*;
 use crate::editor::*;
 
 pub struct ScaleButton {

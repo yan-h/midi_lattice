@@ -3,6 +3,7 @@ use crate::GridParams;
 
 use crate::editor::lattice::grid;
 use crate::editor::lattice::Lattice;
+use crate::editor::note_spectrum::NoteSpectrum;
 use crate::editor::resizer::Resizer;
 use crate::editor::tuning_learn_button::TuningLearnButton;
 use crate::MidiLatticeParams;
@@ -21,15 +22,17 @@ use nih_plug_vizia::{create_vizia_editor, ViziaTheming};
 use std::sync::{Arc, Mutex};
 use triple_buffer::Output;
 
+mod color;
 mod lattice;
+mod note_spectrum;
 mod resizer;
 mod scale_button;
 mod tuning_learn_button;
 
-pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
-pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.7 + PADDING * 2.0;
+pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.6 + PADDING * 2.0;
+pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.6 + PADDING * 2.0;
 
-pub const PADDING: f32 = grid::NODE_SIZE * 0.08;
+pub const PADDING: f32 = grid::NODE_SIZE * 0.075;
 pub const CORNER_RADIUS: f32 = PADDING * 1.5;
 
 #[derive(Lens, Clone)]
@@ -56,43 +59,6 @@ pub const MAX_GRID_HEIGHT: u8 = 30;
 
 pub const NON_GRID_HEIGHT: f32 = BOTTOM_REGION_HEIGHT + PADDING;
 pub const NON_GRID_WIDTH: f32 = RIGHT_REGION_WIDTH + PADDING;
-
-// Darkest color
-pub static COLOR_0: vg::Color = vg::Color::rgbf(
-    0x30 as f32 / 255.0,
-    0x30 as f32 / 255.0,
-    0x30 as f32 / 255.0,
-);
-
-pub static COLOR_1: vg::Color = vg::Color::rgbf(
-    0x50 as f32 / 255.0,
-    0x50 as f32 / 255.0,
-    0x50 as f32 / 255.0,
-);
-
-pub static COLOR_2: vg::Color = vg::Color::rgbf(
-    0x74 as f32 / 255.0,
-    0x74 as f32 / 255.0,
-    0x74 as f32 / 255.0,
-);
-
-pub static COLOR_2_HIGHLIGHT: vg::Color = vg::Color::rgbf(
-    0x8D as f32 / 255.0,
-    0x8D as f32 / 255.0,
-    0x8D as f32 / 255.0,
-);
-
-// Brightest color
-pub static COLOR_3: vg::Color = vg::Color::rgbf(
-    0xff as f32 / 255.0,
-    0xff as f32 / 255.0,
-    0xff as f32 / 255.0,
-);
-
-// Colors for overlay buttons on lattice, which are only shown on mouse over.
-pub static OVERLAY_COLOR_0: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 0.4);
-pub static OVERLAY_COLOR_1: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 0.8);
-pub static OVERLAY_COLOR_2: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 1.0);
 
 pub fn make_icon_paint(color: vg::Color, width: f32) -> Paint {
     let mut icon_paint = vg::Paint::color(color);
@@ -180,6 +146,18 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
                 .left(Units::Pixels(PADDING))
                 .top(Units::Pixels(PADDING))
                 .right(Units::Pixels(RIGHT_REGION_WIDTH));
+
+            NoteSpectrum::new(
+                cx,
+                Data::params.map(|p| p.grid_params.clone()),
+                Data::voices_output,
+            )
+            .position_type(PositionType::SelfDirected)
+            .top(Units::Pixels(PADDING))
+            .right(Units::Pixels(PADDING))
+            .left(Units::Stretch(1.0))
+            .bottom(Units::Pixels(BOTTOM_REGION_HEIGHT))
+            .width(Units::Pixels(RIGHT_REGION_WIDTH - PADDING * 2.0));
 
             Resizer::new(cx)
                 .position_type(PositionType::SelfDirected)

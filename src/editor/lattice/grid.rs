@@ -1,27 +1,21 @@
 use crate::MidiLatticeParams;
-use crate::NoteColorScheme;
 use crate::ShowZAxis;
 use crate::Voices;
 
 use crate::assets;
+use crate::editor::color::*;
 use crate::editor::make_icon_paint;
-use crate::editor::COLOR_0;
-use crate::editor::COLOR_2_HIGHLIGHT;
 use crate::midi::MidiVoice;
-use crate::tuning;
 use crate::tuning::NoteNameInfo;
 use crate::tuning::PitchClass;
 use crate::tuning::PitchClassDistance;
 use crate::tuning::PrimeCountVector;
 use color_space::Lch;
 use color_space::Rgb;
-use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::vizia::vg::FontId;
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::f32::consts::PI;
 use std::sync::atomic::Ordering;
 use std::sync::MutexGuard;
@@ -29,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use triple_buffer::Output;
 
-use crate::editor::{COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS, PADDING};
+use crate::editor::{CORNER_RADIUS, PADDING};
 
 pub const NODE_SIZE: f32 = 50.0;
 
@@ -203,33 +197,6 @@ impl Grid {
     }
 }
 
-fn lch_to_vg_color(lch_color: Lch) -> vg::Color {
-    let rgbcolor = Rgb::from(lch_color);
-
-    vg::Color::rgbf(
-        rgbcolor.r as f32 / 255.0,
-        rgbcolor.g as f32 / 255.0,
-        rgbcolor.b as f32 / 255.0,
-    )
-}
-
-static CHANNEL_COLORS: Lazy<[vg::Color; 9]> = Lazy::new(|| {
-    [
-        Lch::new(50.0, 45.0, 35.0),  // 1 red
-        Lch::new(65.0, 55.0, 70.0),  // 2 orange
-        Lch::new(75.0, 60.0, 90.0),  // 3 yellow
-        Lch::new(65.0, 50.0, 120.0), // 4 green
-        Lch::new(60.0, 40.0, 280.0), // 5 blue
-        Lch::new(50.0, 55.0, 305.0), // 6 purple
-        Lch::new(70.0, 30.0, 340.0), // 7 pink
-        Lch::new(80.0, 0.0, 0.0),    // 8 white
-        Lch::new(0.0, 0.0, 0.0),     // 9 black
-                                     // 10-15 are colored based on pitch
-                                     // 16 is just an outline
-    ]
-    .map(|x| lch_to_vg_color(x))
-});
-
 /// Arguments used to draw the grid. Passed into sub-methods of [`Grid::draw()`].
 struct DrawGridArgs {
     scale: f32,
@@ -345,30 +312,29 @@ impl DrawNodeArgs {
 
         let note_name_info = primes.note_name_info();
 
+        let mut matching_voices_ordered_by_pitch = matching_voices.clone();
+        // Sort by channel (reverse), then by pitch
+        matching_voices_ordered_by_pitch.sort_by(|a, b| {
+            let channel_cmp: std::cmp::Ordering = b.get_channel().cmp(&a.get_channel());
+            match channel_cmp {
+                std::cmp::Ordering::Equal => a.get_pitch().total_cmp(&b.get_pitch()),
+                _ => channel_cmp,
+            }
+        });
+
         // Determine colors and outline
         let mut colors: Vec<vg::Color> = Vec::with_capacity(15);
         let mut draw_outline = false;
-        for v in &matching_voices {
-            if v.get_channel() < 9 {
-                // These channels have a fixed color
-                colors.push(CHANNEL_COLORS[usize::from(v.get_channel())]);
-            } else if v.get_channel() < 15 {
-                // These channels are colored by pitch, on a gradient
-                let pitch_color_index: f64 = ((v
-                    .get_pitch()
-                    .min(args.brightest_pitch)
-                    .max(args.darkest_pitch)
-                    - args.darkest_pitch)
-                    / (args.brightest_pitch - args.darkest_pitch).max(0.01))
-                    as f64;
-                colors.push(lch_to_vg_color(Lch::new(
-                    25.0 + pitch_color_index * 55.0,
-                    65.0 - pitch_color_index * 35.0,
-                    (-20.0 + pitch_color_index * 110.0).rem_euclid(360.0),
-                )));
-            } else if v.get_channel() == 15 {
-                // The last channel only controls whether the note is outlined
+        for v in &matching_voices_ordered_by_pitch {
+            if v.get_channel() == 15 {
                 draw_outline = true;
+            } else {
+                colors.push(note_color(
+                    v.get_channel(),
+                    v.get_pitch(),
+                    args.darkest_pitch,
+                    args.brightest_pitch,
+                ));
             }
         }
 
@@ -519,19 +485,6 @@ fn draw_node_zero_z(
     }
 
     fn draw_main_node_square(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {
-        // Draw outline for channel 16
-        /*if node_args.draw_outline {
-            let mut outline_path = vg::Path::new();
-            outline_path.rounded_rect(
-                node_args.draw_node_x - node_args.outline_width,
-                node_args.draw_node_y - node_args.outline_width,
-                NODE_SIZE * args.scale + node_args.outline_width * 2.0,
-                NODE_SIZE * args.scale + node_args.outline_width * 2.0,
-                args.scaled_inner_corner_radius + node_args.outline_width,
-            );
-            canvas.fill_path(&mut outline_path, &vg::Paint::color(COLOR_3));
-        }*/
-
         let mut node_path = vg::Path::new();
         node_path.rounded_rect(
             node_args.draw_node_x,
@@ -550,7 +503,7 @@ fn draw_node_zero_z(
                     node_args.draw_node_x,
                     node_args.draw_node_y,
                     args.scaled_node_size,
-                    7,
+                    (node_args.colors.len() * 3) as u8,
                 );
                 canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
             }
@@ -603,7 +556,7 @@ fn draw_node_zero_z(
         } else if draw_z_pos && !draw_z_neg {
             // Centered vertically on left half
             match max_accidental_str_len {
-                0 => (0.60, 0.48, 0.58),
+                0 => (0.60, 0.44, 0.58),
                 1 => (0.45, 0.32, 0.58),
                 _ => (0.37, 0.26, 0.58),
             }

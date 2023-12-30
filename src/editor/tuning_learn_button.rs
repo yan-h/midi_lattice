@@ -10,9 +10,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use crate::editor::{
-    intersects_box, make_icon_stroke_paint, COLOR_0, COLOR_1, COLOR_2, COLOR_3, CORNER_RADIUS,
-};
+use crate::editor::color::*;
+use crate::editor::{intersects_box, make_icon_stroke_paint, CORNER_RADIUS};
 
 use super::PADDING;
 
