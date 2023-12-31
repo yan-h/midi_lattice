@@ -407,7 +407,7 @@ fn prepare_canvas(_cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArg
         args.bounds.w - args.scaled_padding * 1.5,
         args.bounds.h - args.scaled_padding * 1.5,
     );
-    canvas.fill_path(&background_path, &vg::Paint::color(COLOR_0));
+    canvas.fill_path(&background_path, &vg::Paint::color(BACKGROUND_COLOR));
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 }
 
@@ -422,7 +422,7 @@ fn finish_canvas(_cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs
         args.bounds.h + args.scaled_padding * 2.0,
         args.scaled_corner_radius,
     );
-    canvas.fill_path(&background_path_refill, &vg::Paint::color(COLOR_0));
+    canvas.fill_path(&background_path_refill, &vg::Paint::color(BACKGROUND_COLOR));
 }
 
 fn draw_extra_colors(
@@ -519,9 +519,9 @@ fn draw_node_zero_z(
             canvas.fill_path(
                 &mut node_path,
                 &vg::Paint::color(if node_args.highlighted {
-                    COLOR_2
+                    HIGHLIGHT_COLOR
                 } else {
-                    COLOR_1
+                    BASE_COLOR
                 }),
             );
         }
@@ -530,7 +530,7 @@ fn draw_node_zero_z(
         if node_args.draw_outline {
             canvas.stroke_path(
                 &node_path,
-                &make_icon_paint(COLOR_3, node_args.outline_width),
+                &make_icon_paint(TEXT_COLOR, node_args.outline_width),
             );
         }
     }
@@ -542,7 +542,7 @@ fn draw_node_zero_z(
         draw_z_pos: bool,
         draw_z_neg: bool,
     ) {
-        let mut text_paint = vg::Paint::color(COLOR_3);
+        let mut text_paint = vg::Paint::color(TEXT_COLOR);
         text_paint.set_text_align(vg::Align::Right);
 
         let show_syntonic_commas =
@@ -619,7 +619,7 @@ fn draw_node_zero_z(
         node_args: &DrawNodeArgs,
         draw_z_neg: bool,
     ) {
-        let mut text_paint = vg::Paint::color(COLOR_3);
+        let mut text_paint = vg::Paint::color(TEXT_COLOR);
         text_paint.set_text_align(vg::Align::Center);
         args.font_id.map(|f| text_paint.set_font(&[f]));
         if draw_z_neg {
@@ -726,7 +726,7 @@ fn draw_node_zero_z(
         );
 
         canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
-        canvas.fill_path(&mut negative_path, &vg::Paint::color(COLOR_0));
+        canvas.fill_path(&mut negative_path, &vg::Paint::color(BACKGROUND_COLOR));
         canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 
         if node_args.draw_outline {
@@ -762,7 +762,7 @@ fn draw_node_zero_z(
 
             canvas.stroke_path(
                 &mut outline_path,
-                &make_icon_paint(COLOR_3, args.scaled_padding * OUTLINE_PADDING_RATIO),
+                &make_icon_paint(TEXT_COLOR, args.scaled_padding * OUTLINE_PADDING_RATIO),
             );
         }
     }
@@ -829,7 +829,7 @@ fn draw_node_zero_z(
         );
 
         canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
-        canvas.fill_path(&mut negative_path, &vg::Paint::color(COLOR_0));
+        canvas.fill_path(&mut negative_path, &vg::Paint::color(BACKGROUND_COLOR));
         canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 
         if node_args.draw_outline {
@@ -867,7 +867,7 @@ fn draw_node_zero_z(
             );
             canvas.stroke_path(
                 &mut outline_path,
-                &make_icon_paint(COLOR_3, args.scaled_padding * OUTLINE_PADDING_RATIO),
+                &make_icon_paint(TEXT_COLOR, args.scaled_padding * OUTLINE_PADDING_RATIO),
             );
         }
     }
@@ -906,7 +906,7 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
     // Clear background
     canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
     let mut background_rect_path = vg::Path::new();
-    canvas.fill_path(&mut background_rect_path, &vg::Paint::color(COLOR_1));
+    canvas.fill_path(&mut background_rect_path, &vg::Paint::color(BASE_COLOR));
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 
     // Draw background rectangle
@@ -924,9 +924,9 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
         canvas.fill_path(
             &mut mini_node_path,
             &vg::Paint::color(if node_args.highlighted {
-                COLOR_2
+                HIGHLIGHT_COLOR
             } else {
-                COLOR_1
+                BASE_COLOR
             }),
         );
     }
@@ -947,12 +947,12 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
     if node_args.draw_outline {
         canvas.stroke_path(
             &mini_node_path,
-            &make_icon_paint(COLOR_3, node_args.outline_width),
+            &make_icon_paint(TEXT_COLOR, node_args.outline_width),
         );
     }
 
     // Draw text (first row; whole number cents)
-    let mut text_paint = vg::Paint::color(COLOR_3);
+    let mut text_paint = vg::Paint::color(TEXT_COLOR);
     text_paint.set_font_size(args.scaled_node_size * 0.19);
     text_paint.set_text_align(vg::Align::Center);
     args.font_id.map(|f| text_paint.set_font(&[f]));

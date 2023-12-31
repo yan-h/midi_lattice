@@ -52,7 +52,7 @@ impl View for NoteSpectrum {
             cx.bounds().height(),
             CORNER_RADIUS * cx.scale_factor(),
         );
-        canvas.fill_path(&background_path, &vg::Paint::color(COLOR_1));
+        canvas.fill_path(&background_path, &vg::Paint::color(BASE_COLOR));
 
         let min_pitch: f32 = 60.0 - 12.0 * 3.0;
         let max_pitch: f32 = 60.0 + 12.0 * 3.0;
@@ -116,7 +116,7 @@ impl View for NoteSpectrum {
                 cx.bounds().y + cx.bounds().height() - pitch_idx * cx.bounds().height(),
             );
 
-            let mut notch_paint = vg::Paint::color(COLOR_0);
+            let mut notch_paint = vg::Paint::color(BACKGROUND_COLOR);
             notch_paint.set_line_width(width * cx.scale_factor());
             notch_paint.set_line_cap(vg::LineCap::Round);
 

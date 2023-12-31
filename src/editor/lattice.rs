@@ -13,10 +13,10 @@ use self::grid::Grid;
 use self::grid::NODE_SIZE;
 use self::grid_resizer::GridResizer;
 
-use super::color::COLOR_0;
-use super::color::COLOR_3;
+use super::color::BACKGROUND_COLOR;
+use super::color::TEXT_COLOR;
 use super::intersects_box;
-use crate::editor::color::COLOR_1;
+use crate::editor::color::BASE_COLOR;
 mod drag_region;
 pub mod grid;
 pub mod grid_resizer;

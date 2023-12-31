@@ -31,7 +31,7 @@ pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.618 + PADDING;
 pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.618 + PADDING;
 
 pub const PADDING: f32 = grid::NODE_SIZE * 0.08;
-pub const CORNER_RADIUS: f32 = PADDING * 0.57;
+pub const CORNER_RADIUS: f32 = PADDING * 0.55;
 
 #[derive(Lens, Clone)]
 pub struct Data {

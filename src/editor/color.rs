@@ -4,31 +4,23 @@ use color_space::{Lch, Rgb};
 use nih_plug_vizia::vizia::vg::{self, Color};
 use once_cell::sync::Lazy;
 
-// Darkest color
-pub static COLOR_0: vg::Color = vg::Color::rgbf(
-    0x30 as f32 / 255.0,
-    0x30 as f32 / 255.0,
-    0x30 as f32 / 255.0,
-);
+const fn grey(rgb_value: f32) -> vg::Color {
+    vg::Color::rgbf(rgb_value, rgb_value, rgb_value)
+}
 
-pub static COLOR_1: vg::Color = vg::Color::rgbf(
-    0x53 as f32 / 255.0,
-    0x53 as f32 / 255.0,
-    0x53 as f32 / 255.0,
-);
+const MAX_COLOR_VALUE: f32 = 255.0;
 
-pub static COLOR_2: vg::Color = vg::Color::rgbf(
-    0x76 as f32 / 255.0,
-    0x76 as f32 / 255.0,
-    0x76 as f32 / 255.0,
-);
+// Darkest color - for background
+pub static BACKGROUND_COLOR: vg::Color = grey(0x38 as f32 / MAX_COLOR_VALUE);
 
-// Brightest color
-pub static COLOR_3: vg::Color = vg::Color::rgbf(
-    0xff as f32 / 255.0,
-    0xff as f32 / 255.0,
-    0xff as f32 / 255.0,
-);
+// For buttons and nodes in their default state.
+pub static BASE_COLOR: vg::Color = grey(0x60 as f32 / MAX_COLOR_VALUE);
+
+// For highlighted nodes, and moused over buttons.
+pub static HIGHLIGHT_COLOR: vg::Color = grey(0x80 as f32 / MAX_COLOR_VALUE);
+
+// For text, or fucused buttons
+pub static TEXT_COLOR: vg::Color = grey(0xff as f32 / MAX_COLOR_VALUE);
 
 // Colors for overlay buttons on lattice, which are only shown on mouse over.
 pub static OVERLAY_COLOR_0: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 0.4);
@@ -77,7 +69,7 @@ pub fn note_color(channel: u8, pitch: f32, darkest_pitch: f32, brightest_pitch: 
             (-20.0 + pitch_color_index * 110.0).rem_euclid(360.0),
         ));
     } else if channel == 15 {
-        return COLOR_2;
+        return HIGHLIGHT_COLOR;
     } else {
         panic!("Invalid midi channel");
     }

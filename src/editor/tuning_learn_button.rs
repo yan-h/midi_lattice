@@ -88,11 +88,11 @@ impl View for TuningLearnButton {
         container_path.close();
 
         let paint = vg::Paint::color(if self.learn_active {
-            COLOR_3
+            TEXT_COLOR
         } else if highlighted {
-            COLOR_2
+            HIGHLIGHT_COLOR
         } else {
-            COLOR_1
+            BASE_COLOR
         });
         canvas.fill_path(&mut container_path, &paint);
 
@@ -112,7 +112,7 @@ impl View for TuningLearnButton {
         );
         icon_path.close();
 
-        let icon_paint = make_icon_stroke_paint(COLOR_0, scale);
+        let icon_paint = make_icon_stroke_paint(BACKGROUND_COLOR, scale);
 
         canvas.stroke_path(&mut icon_path, &icon_paint);
     }

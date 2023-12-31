@@ -115,17 +115,17 @@ impl View for Resizer {
 
         // Fill with background color
         let paint = vg::Paint::color(if self.drag_active {
-            COLOR_3
+            TEXT_COLOR
         } else if highlighted {
-            COLOR_2
+            HIGHLIGHT_COLOR
         } else {
-            COLOR_1
+            BASE_COLOR
         });
         canvas.fill_path(&mut container_path, &paint);
 
         let icon_line_width: f32 = PADDING * scale;
         let icon_padding: f32 = PADDING * scale + icon_line_width * 0.5;
-        let color = COLOR_0;
+        let color = BACKGROUND_COLOR;
         let icon_paint = make_icon_stroke_paint(color, scale);
         let mut icon_path = vg::Path::new();
         // top right
