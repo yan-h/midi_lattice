@@ -321,20 +321,10 @@ impl DrawNodeArgs {
 
         let note_name_info = primes.note_name_info();
 
-        let mut matching_voices_ordered_by_pitch = matching_voices.clone();
-        // Sort by channel (reverse), then by pitch
-        matching_voices_ordered_by_pitch.sort_by(|a, b| {
-            let channel_cmp: std::cmp::Ordering = b.get_channel().cmp(&a.get_channel());
-            match channel_cmp {
-                std::cmp::Ordering::Equal => a.get_pitch().total_cmp(&b.get_pitch()),
-                _ => channel_cmp,
-            }
-        });
-
         // Determine colors and outline
         let mut colors: Vec<vg::Color> = Vec::with_capacity(15);
         let mut draw_outline = false;
-        for v in &matching_voices_ordered_by_pitch {
+        for v in &matching_voices {
             if v.get_channel() == 15 {
                 draw_outline = true;
             } else {
@@ -346,6 +336,10 @@ impl DrawNodeArgs {
                 ));
             }
         }
+
+        // I think this sorts primarily by hue, which is what we want
+        colors.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        colors.dedup();
 
         let draw = match base_z {
             // Always draw main nodes

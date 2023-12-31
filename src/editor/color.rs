@@ -29,9 +29,9 @@ pub static OVERLAY_COLOR_2: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 1.0);
 
 pub static CHANNEL_COLORS: Lazy<[vg::Color; 9]> = Lazy::new(|| {
     [
-        Lch::new(50.0, 45.0, 35.0),  // 1 red
-        Lch::new(65.0, 55.0, 70.0),  // 2 orange
-        Lch::new(75.0, 60.0, 90.0),  // 3 yellow
+        Lch::new(48.0, 45.0, 32.0),  // 1 red
+        Lch::new(65.0, 60.0, 68.0),  // 2 orange
+        Lch::new(80.0, 42.0, 83.0),  // 3 yellow
         Lch::new(65.0, 50.0, 120.0), // 4 green
         Lch::new(60.0, 40.0, 280.0), // 5 blue
         Lch::new(50.0, 55.0, 305.0), // 6 purple
