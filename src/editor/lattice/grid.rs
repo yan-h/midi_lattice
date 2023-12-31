@@ -11,7 +11,6 @@ use crate::tuning::PitchClass;
 use crate::tuning::PitchClassDistance;
 use crate::tuning::PrimeCountVector;
 
-
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::vizia::vg::FontId;
@@ -289,10 +288,13 @@ impl DrawNodeArgs {
         primes: PrimeCountVector,
     ) -> Self {
         let (draw_node_x, draw_node_y): (f32, f32) = (
-            args.bounds.x + ((base_x as f32) * NODE_SIZE + (base_x as f32) * PADDING) * args.scale
+            args.bounds.x
+                + (PADDING * 0.5 + (base_x as f32) * NODE_SIZE + (base_x as f32) * PADDING)
+                    * args.scale
                 - ((args.grid_x.rem_euclid(1.0)) * (NODE_SIZE + PADDING) * args.scale),
             args.bounds.y
-                + ((base_y as f32) * NODE_SIZE + (base_y as f32) * PADDING) * args.scale
+                + (PADDING * 0.5 + (base_y as f32) * NODE_SIZE + (base_y as f32) * PADDING)
+                    * args.scale
                 + ((args.grid_y.rem_euclid(1.0)) * (NODE_SIZE + PADDING) * args.scale),
         );
 
@@ -383,23 +385,23 @@ fn prepare_canvas(_cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArg
     canvas.intersect_scissor(
         args.bounds.x - args.scaled_padding * 0.5,
         args.bounds.y - args.scaled_padding * 0.5,
-        args.bounds.w + args.scaled_padding,
-        args.bounds.h + args.scaled_padding,
+        args.bounds.w + args.scaled_padding * 1.0,
+        args.bounds.h + args.scaled_padding * 1.0,
     );
 
     // Carve out entire background, with half padding around.
     // This is necessary to use clipping when drawing with femtovg's composite operations.
-    // We'll put the background back afterwards.
+    // We'll put the background back afterwards in `finish_canvas`.
     canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
     let mut background_path = vg::Path::new();
     background_path.rounded_rect(
-        args.bounds.x - args.scaled_padding * 0.4,
-        args.bounds.y - args.scaled_padding * 0.4,
-        args.bounds.w + args.scaled_padding * 0.8,
-        args.bounds.h + args.scaled_padding * 0.8,
-        (CORNER_RADIUS - PADDING * 0.4) * args.scale,
+        args.bounds.x - args.scaled_padding * 0.5,
+        args.bounds.y - args.scaled_padding * 0.5,
+        args.bounds.w + args.scaled_padding * 1.0,
+        args.bounds.h + args.scaled_padding * 1.0,
+        (CORNER_RADIUS - PADDING * 0.5) * args.scale,
     );
-    canvas.fill_path(&background_path, &vg::Paint::color(COLOR_1));
+    canvas.fill_path(&background_path, &vg::Paint::color(COLOR_0));
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
 }
 
@@ -414,7 +416,7 @@ fn finish_canvas(_cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs
         args.bounds.h + args.scaled_padding * 2.0,
         args.scaled_corner_radius,
     );
-    canvas.fill_path(&background_path_refill, &vg::Paint::color(COLOR_1));
+    canvas.fill_path(&background_path_refill, &vg::Paint::color(COLOR_0));
 }
 
 fn draw_extra_colors(
@@ -511,9 +513,9 @@ fn draw_node_zero_z(
             canvas.fill_path(
                 &mut node_path,
                 &vg::Paint::color(if node_args.highlighted {
-                    COLOR_2_HIGHLIGHT
-                } else {
                     COLOR_2
+                } else {
+                    COLOR_1
                 }),
             );
         }
@@ -917,9 +919,9 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
         canvas.fill_path(
             &mut mini_node_path,
             &vg::Paint::color(if node_args.highlighted {
-                COLOR_2_HIGHLIGHT
-            } else {
                 COLOR_2
+            } else {
+                COLOR_1
             }),
         );
     }

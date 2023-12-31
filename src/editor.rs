@@ -77,7 +77,7 @@ pub fn width_to_grid_width(width: f32) -> u8 {
         MAX_GRID_WIDTH,
         max(
             MIN_GRID_WIDTH,
-            ((width - NON_GRID_WIDTH - PADDING) / (grid::NODE_SIZE + PADDING)) as u8,
+            ((width - NON_GRID_WIDTH - PADDING * 3.0) / (grid::NODE_SIZE + PADDING)) as u8,
         ),
     )
 }
@@ -87,7 +87,7 @@ pub fn height_to_grid_height(height: f32) -> u8 {
         MAX_GRID_HEIGHT,
         max(
             MIN_GRID_HEIGHT,
-            ((height - NON_GRID_HEIGHT - PADDING) / (grid::NODE_SIZE + PADDING)) as u8,
+            ((height - NON_GRID_HEIGHT - PADDING * 2.0) / (grid::NODE_SIZE + PADDING)) as u8,
         ),
     )
 }
@@ -97,11 +97,11 @@ pub fn vizia_state(grid_params: Arc<GridParams>) -> Arc<ViziaState> {
         let width: u32 = ((grid::NODE_SIZE + PADDING)
             * (grid_params.width.load(Ordering::Relaxed) as f32)
             + NON_GRID_WIDTH
-            + PADDING) as u32;
+            + PADDING * 2.0) as u32;
         let height: u32 = ((grid::NODE_SIZE + PADDING)
             * (grid_params.height.load(Ordering::Relaxed) as f32)
             + NON_GRID_HEIGHT
-            + PADDING) as u32;
+            + PADDING * 2.0) as u32;
         (width, height)
     })
 }

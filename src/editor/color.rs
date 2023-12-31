@@ -12,21 +12,15 @@ pub static COLOR_0: vg::Color = vg::Color::rgbf(
 );
 
 pub static COLOR_1: vg::Color = vg::Color::rgbf(
-    0x50 as f32 / 255.0,
-    0x50 as f32 / 255.0,
-    0x50 as f32 / 255.0,
+    0x53 as f32 / 255.0,
+    0x53 as f32 / 255.0,
+    0x53 as f32 / 255.0,
 );
 
 pub static COLOR_2: vg::Color = vg::Color::rgbf(
-    0x74 as f32 / 255.0,
-    0x74 as f32 / 255.0,
-    0x74 as f32 / 255.0,
-);
-
-pub static COLOR_2_HIGHLIGHT: vg::Color = vg::Color::rgbf(
-    0x8D as f32 / 255.0,
-    0x8D as f32 / 255.0,
-    0x8D as f32 / 255.0,
+    0x76 as f32 / 255.0,
+    0x76 as f32 / 255.0,
+    0x76 as f32 / 255.0,
 );
 
 // Brightest color
