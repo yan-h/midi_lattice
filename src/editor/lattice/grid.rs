@@ -172,7 +172,8 @@ impl Grid {
 
         // Refresh currently playing pitch classes
         for voice in voices.iter() {
-            if voice.get_channel() != 15 {
+            // Don't count ignored or outline-only channels
+            if voice.get_channel() <= 13 {
                 animation_info
                     .recent_pitch_classes
                     .insert(voice.get_pitch_class(), highlight_duration);
@@ -325,15 +326,15 @@ impl DrawNodeArgs {
         let mut colors: Vec<vg::Color> = Vec::with_capacity(15);
         let mut draw_outline = false;
         for v in &matching_voices {
-            if v.get_channel() == 15 {
-                draw_outline = true;
-            } else {
+            if v.get_channel() <= 13 {
                 colors.push(note_color(
                     v.get_channel(),
                     v.get_pitch(),
                     args.darkest_pitch,
                     args.brightest_pitch,
                 ));
+            } else if v.get_channel() == 14 {
+                draw_outline = true;
             }
         }
 

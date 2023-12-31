@@ -62,6 +62,9 @@ impl View for NoteSpectrum {
         let voices: Vec<MidiVoice> = voices_output.read().values().cloned().collect();
         std::mem::drop(voices_output);
         for voice in voices {
+            if voice.get_channel() == 15 {
+                continue;
+            }
             let pitch = voice.get_pitch();
             let color = note_color(
                 voice.get_channel(),
