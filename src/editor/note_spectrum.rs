@@ -50,7 +50,7 @@ impl View for NoteSpectrum {
             cx.bounds().y,
             cx.bounds().width(),
             cx.bounds().height(),
-            (CORNER_RADIUS - PADDING * 0.4) * cx.scale_factor(),
+            CORNER_RADIUS * cx.scale_factor(),
         );
         canvas.fill_path(&background_path, &vg::Paint::color(COLOR_1));
 
@@ -105,7 +105,7 @@ impl View for NoteSpectrum {
             let (length, width): (f32, f32) = if half_octave.rem_euclid(2) == 0 {
                 (0.2, 3.0)
             } else {
-                (0.12, 2.5)
+                (0.1, 2.0)
             };
             notch_path.move_to(
                 cx.bounds().x + cx.bounds().width() * (1.0 - length),

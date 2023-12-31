@@ -5,8 +5,6 @@ use crate::editor::width_to_grid_width;
 use crate::editor::*;
 use crate::GridParams;
 
-
-
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::widgets::GuiContextEvent;
 use std::sync::atomic::Ordering;
@@ -98,7 +96,7 @@ impl View for GridResizer {
         let scale: f32 = cx.scale_factor() as f32;
         let bounds = cx.bounds();
 
-        let icon_padding: f32 = PADDING * 1.75 * scale;
+        let icon_padding: f32 = PADDING * 1.6 * scale;
 
         let color = if self.drag_active {
             OVERLAY_COLOR_2
@@ -107,7 +105,7 @@ impl View for GridResizer {
         } else {
             OVERLAY_COLOR_0
         };
-        let icon_paint = &make_icon_paint(color, PADDING * 2.5 * scale);
+        let icon_paint = &make_icon_paint(color, PADDING * 2.0 * scale);
         let mut icon_path = vg::Path::new();
         // top right
         icon_path.move_to(bounds.x + bounds.w - icon_padding, bounds.y + icon_padding);

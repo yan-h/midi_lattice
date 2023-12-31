@@ -202,7 +202,6 @@ struct DrawGridArgs {
     scaled_node_size: f32,
     scaled_padding: f32,
     scaled_corner_radius: f32,
-    scaled_inner_corner_radius: f32,
     bounds: BoundingBox,
     grid_width: i32,
     grid_height: i32,
@@ -236,15 +235,23 @@ impl DrawGridArgs {
         let highlighted_pitch_classes =
             grid.update_and_get_highlighted_pitch_classes(&sorted_voices, highlight_duration);
 
+        let scaled_padding = PADDING * cx.scale_factor();
+        let grid_width = grid.params.grid_params.width.load(Ordering::Relaxed) as i32;
+        let grid_height = grid.params.grid_params.height.load(Ordering::Relaxed) as i32;
+
+        // We can't just use `NODE_SIZE` here because that turns out to be slightly too big in
+        // practice. Not sure why. Calculating it off the actual width/height works better.
+        let scaled_node_size =
+            (cx.bounds().width() - scaled_padding * (grid_width as f32 + 1.0)) / grid_width as f32;
+
         DrawGridArgs {
             scale: cx.scale_factor(),
-            scaled_node_size: NODE_SIZE * cx.scale_factor(),
-            scaled_padding: PADDING * cx.scale_factor(),
+            scaled_node_size,
+            scaled_padding,
             scaled_corner_radius: CORNER_RADIUS * cx.scale_factor(),
-            scaled_inner_corner_radius: (CORNER_RADIUS - PADDING) * cx.scale_factor(),
             bounds: cx.bounds(),
-            grid_width: grid.params.grid_params.width.load(Ordering::Relaxed) as i32,
-            grid_height: grid.params.grid_params.height.load(Ordering::Relaxed) as i32,
+            grid_width,
+            grid_height,
             grid_x: grid.params.grid_params.x.value(),
             grid_y: grid.params.grid_params.y.value(),
             grid_z: grid.params.grid_params.z.value(),
@@ -289,13 +296,13 @@ impl DrawNodeArgs {
     ) -> Self {
         let (draw_node_x, draw_node_y): (f32, f32) = (
             args.bounds.x
-                + (PADDING * 0.5 + (base_x as f32) * NODE_SIZE + (base_x as f32) * PADDING)
-                    * args.scale
-                - ((args.grid_x.rem_euclid(1.0)) * (NODE_SIZE + PADDING) * args.scale),
+                + (args.scaled_padding
+                    + (base_x as f32 - args.grid_x.rem_euclid(1.0))
+                        * (args.scaled_node_size + args.scaled_padding)),
             args.bounds.y
-                + (PADDING * 0.5 + (base_y as f32) * NODE_SIZE + (base_y as f32) * PADDING)
-                    * args.scale
-                + ((args.grid_y.rem_euclid(1.0)) * (NODE_SIZE + PADDING) * args.scale),
+                + (args.scaled_padding
+                    + ((base_y as f32 + args.grid_y.rem_euclid(1.0))
+                        * (args.scaled_node_size + args.scaled_padding))),
         );
 
         // Pitch class represented by this node
@@ -383,10 +390,10 @@ impl DrawNodeArgs {
 fn prepare_canvas(_cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArgs) {
     // Hides everything out of args.bounds - for nodes that stick out when scrolling
     canvas.intersect_scissor(
-        args.bounds.x - args.scaled_padding * 0.5,
-        args.bounds.y - args.scaled_padding * 0.5,
-        args.bounds.w + args.scaled_padding * 1.0,
-        args.bounds.h + args.scaled_padding * 1.0,
+        args.bounds.x + args.scaled_padding * OUTLINE_PADDING_RATIO,
+        args.bounds.y + args.scaled_padding * OUTLINE_PADDING_RATIO,
+        args.bounds.w - args.scaled_padding * OUTLINE_PADDING_RATIO * 2.0,
+        args.bounds.h - args.scaled_padding * OUTLINE_PADDING_RATIO * 2.0,
     );
 
     // Carve out entire background, with half padding around.
@@ -394,12 +401,11 @@ fn prepare_canvas(_cx: &mut DrawContext, canvas: &mut Canvas, args: &DrawGridArg
     // We'll put the background back afterwards in `finish_canvas`.
     canvas.global_composite_operation(vg::CompositeOperation::DestinationOut);
     let mut background_path = vg::Path::new();
-    background_path.rounded_rect(
-        args.bounds.x - args.scaled_padding * 0.5,
-        args.bounds.y - args.scaled_padding * 0.5,
-        args.bounds.w + args.scaled_padding * 1.0,
-        args.bounds.h + args.scaled_padding * 1.0,
-        (CORNER_RADIUS - PADDING * 0.5) * args.scale,
+    background_path.rect(
+        args.bounds.x + args.scaled_padding * 0.75, // Add buffer above 0.5 to avoid dark lines
+        args.bounds.y + args.scaled_padding * 0.75,
+        args.bounds.w - args.scaled_padding * 1.5,
+        args.bounds.h - args.scaled_padding * 1.5,
     );
     canvas.fill_path(&background_path, &vg::Paint::color(COLOR_0));
     canvas.global_composite_operation(vg::CompositeOperation::SourceOver);
@@ -491,9 +497,9 @@ fn draw_node_zero_z(
         node_path.rounded_rect(
             node_args.draw_node_x,
             node_args.draw_node_y,
-            NODE_SIZE * args.scale,
-            NODE_SIZE * args.scale,
-            args.scaled_inner_corner_radius,
+            args.scaled_node_size,
+            args.scaled_node_size,
+            args.scaled_corner_radius,
         );
         if node_args.colors.len() > 0 {
             canvas.fill_path(&mut node_path, &vg::Paint::color(node_args.colors[0]));
@@ -682,28 +688,28 @@ fn draw_node_zero_z(
             0.0,
             0.0,
             0.0,
-            args.scaled_corner_radius - node_args.outline_width * 0.6 * 0.5,
+            args.scaled_corner_radius + args.scaled_padding - node_args.outline_width * 0.6 * 0.5,
         );
 
         let add_corner_negative_path = |path: &mut vg::Path, x: f32, y: f32| {
-            path.move_to(x - args.scaled_inner_corner_radius, y);
+            path.move_to(x - args.scaled_corner_radius, y);
             path.arc_to(
                 x,
                 y,
                 x,
-                y + args.scaled_inner_corner_radius,
-                args.scaled_inner_corner_radius,
+                y + args.scaled_corner_radius,
+                args.scaled_corner_radius,
             );
             path.line_to(
                 x + node_args.outline_width * 0.6,
-                y + args.scaled_inner_corner_radius,
+                y + args.scaled_corner_radius,
             );
             path.line_to(
                 x + node_args.outline_width * 0.6,
                 y - node_args.outline_width * 0.6,
             );
             path.line_to(
-                x - args.scaled_inner_corner_radius,
+                x - args.scaled_corner_radius,
                 y - node_args.outline_width * 0.6,
             );
             path.close();
@@ -727,9 +733,9 @@ fn draw_node_zero_z(
             let mut outline_path = vg::Path::new();
             // top left
             outline_path.arc(
-                background_square_x - args.scaled_inner_corner_radius,
-                background_square_y + args.scaled_inner_corner_radius,
-                args.scaled_inner_corner_radius,
+                background_square_x - args.scaled_corner_radius,
+                background_square_y + args.scaled_corner_radius,
+                args.scaled_corner_radius,
                 TOP,
                 RIGHT,
                 vg::Solidity::Hole,
@@ -741,14 +747,14 @@ fn draw_node_zero_z(
                 background_square_y + background_square_size,
                 background_square_x + args.scaled_corner_radius,
                 background_square_y + background_square_size,
-                args.scaled_corner_radius,
+                args.scaled_corner_radius + args.scaled_padding,
             );
 
             // bottom right
             outline_path.arc(
-                background_square_x + background_square_size - args.scaled_inner_corner_radius,
-                background_square_y + background_square_size + args.scaled_inner_corner_radius,
-                args.scaled_inner_corner_radius,
+                background_square_x + background_square_size - args.scaled_corner_radius,
+                background_square_y + background_square_size + args.scaled_corner_radius,
+                args.scaled_corner_radius,
                 TOP,
                 RIGHT,
                 vg::Solidity::Hole,
@@ -783,22 +789,22 @@ fn draw_node_zero_z(
             background_square_size + node_args.outline_width * 0.6,
             background_square_size + node_args.outline_width * 0.6,
             0.0,
-            args.scaled_corner_radius - node_args.outline_width * 0.6 * 0.5,
+            args.scaled_corner_radius + args.scaled_padding - node_args.outline_width * 0.6 * 0.5,
             0.0,
             0.0,
         );
 
         let add_corner_negative_path = |path: &mut vg::Path, x: f32, y: f32| {
-            path.move_to(x, y - args.scaled_inner_corner_radius);
+            path.move_to(x, y - args.scaled_corner_radius);
             path.arc_to(
                 x,
                 y,
-                x + args.scaled_inner_corner_radius,
+                x + args.scaled_corner_radius,
                 y,
-                args.scaled_inner_corner_radius,
+                args.scaled_corner_radius,
             );
             path.line_to(
-                x + args.scaled_inner_corner_radius,
+                x + args.scaled_corner_radius,
                 y + node_args.outline_width * 0.6,
             );
             path.line_to(
@@ -807,7 +813,7 @@ fn draw_node_zero_z(
             );
             path.line_to(
                 x - node_args.outline_width * 0.6,
-                y - args.scaled_inner_corner_radius,
+                y - args.scaled_corner_radius,
             );
             path.close();
         };
@@ -816,7 +822,6 @@ fn draw_node_zero_z(
         add_corner_negative_path(&mut negative_path, background_square_x, background_square_y);
 
         // Top right corner
-
         add_corner_negative_path(
             &mut negative_path,
             background_square_x + background_square_size,
@@ -832,15 +837,15 @@ fn draw_node_zero_z(
 
             outline_path.move_to(
                 background_square_x,
-                background_square_y - args.scaled_inner_corner_radius,
+                background_square_y - args.scaled_corner_radius,
             );
             // top left
             outline_path.arc_to(
                 background_square_x,
                 background_square_y,
-                background_square_x + args.scaled_inner_corner_radius,
+                background_square_x + args.scaled_corner_radius,
                 background_square_y,
-                args.scaled_inner_corner_radius,
+                args.scaled_corner_radius,
             );
 
             // bottom left (larger)
@@ -849,16 +854,16 @@ fn draw_node_zero_z(
                 background_square_y,
                 background_square_x + background_square_size,
                 background_square_y + args.scaled_corner_radius,
-                args.scaled_corner_radius,
+                args.scaled_corner_radius + args.scaled_padding,
             );
 
             // bottom right
             outline_path.arc_to(
                 background_square_x + background_square_size,
                 background_square_y + background_square_size,
-                background_square_x + background_square_size + args.scaled_inner_corner_radius,
+                background_square_x + background_square_size + args.scaled_corner_radius,
                 background_square_y + background_square_size,
-                args.scaled_inner_corner_radius,
+                args.scaled_corner_radius,
             );
             canvas.stroke_path(
                 &mut outline_path,
@@ -911,7 +916,7 @@ fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &Dra
         mini_node_y,
         mini_node_size,
         mini_node_size,
-        (CORNER_RADIUS - PADDING) * args.scale,
+        args.scaled_corner_radius,
     );
     if node_args.colors.len() > 0 {
         canvas.fill_path(&mut mini_node_path, &vg::Paint::color(node_args.colors[0]));

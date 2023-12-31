@@ -13,6 +13,8 @@ use self::grid::Grid;
 use self::grid::NODE_SIZE;
 use self::grid_resizer::GridResizer;
 
+use super::color::COLOR_0;
+use super::color::COLOR_3;
 use super::intersects_box;
 use crate::editor::color::COLOR_1;
 mod drag_region;
@@ -39,10 +41,10 @@ impl Lattice {
             |cx| {
                 Grid::new(cx, params, voices_output)
                     .position_type(PositionType::SelfDirected)
-                    .bottom(Units::Pixels(PADDING))
-                    .left(Units::Pixels(PADDING))
-                    .top(Units::Pixels(PADDING))
-                    .right(Units::Pixels(PADDING));
+                    .bottom(Units::Pixels(0.0))
+                    .left(Units::Pixels(0.0))
+                    .top(Units::Pixels(0.0))
+                    .right(Units::Pixels(0.0));
 
                 DragRegion::new(cx, params.map(|p| p.grid_params.clone()))
                     .position_type(PositionType::ParentDirected)
@@ -51,8 +53,8 @@ impl Lattice {
 
                 GridResizer::new(cx, params.map(|p| p.grid_params.clone()))
                     .position_type(PositionType::SelfDirected)
-                    .bottom(Units::Pixels(0.0))
-                    .right(Units::Pixels(0.0))
+                    .bottom(Units::Pixels(PADDING))
+                    .right(Units::Pixels(PADDING))
                     .left(Units::Stretch(1.0))
                     .top(Units::Stretch(1.0))
                     .width(Units::Pixels(NODE_SIZE * 1.3))
@@ -127,20 +129,5 @@ impl View for Lattice {
         });
     }
 
-    fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
-        let bounds = cx.bounds();
-        let scale = cx.scale_factor() as f32;
-
-        // Draw background rectangle
-        let mut container_path = vg::Path::new();
-        container_path.rounded_rect(
-            bounds.x,
-            bounds.y,
-            bounds.w,
-            bounds.h,
-            CORNER_RADIUS * scale,
-        );
-        container_path.close();
-        canvas.fill_path(&mut container_path, &vg::Paint::color(COLOR_1));
-    }
+    fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {}
 }

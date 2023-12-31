@@ -27,11 +27,11 @@ mod note_spectrum;
 mod resizer;
 mod tuning_learn_button;
 
-pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.6 + PADDING * 2.0;
-pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.6 + PADDING * 2.0;
+pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.618 + PADDING;
+pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.618 + PADDING;
 
-pub const PADDING: f32 = grid::NODE_SIZE * 0.075;
-pub const CORNER_RADIUS: f32 = PADDING * 1.5;
+pub const PADDING: f32 = grid::NODE_SIZE * 0.08;
+pub const CORNER_RADIUS: f32 = PADDING * 0.57;
 
 #[derive(Lens, Clone)]
 pub struct Data {
@@ -55,8 +55,8 @@ pub const MIN_GRID_HEIGHT: u8 = 4;
 pub const MAX_GRID_WIDTH: u8 = 30;
 pub const MAX_GRID_HEIGHT: u8 = 30;
 
-pub const NON_GRID_HEIGHT: f32 = BOTTOM_REGION_HEIGHT + PADDING;
-pub const NON_GRID_WIDTH: f32 = RIGHT_REGION_WIDTH + PADDING;
+pub const NON_GRID_HEIGHT: f32 = BOTTOM_REGION_HEIGHT;
+pub const NON_GRID_WIDTH: f32 = RIGHT_REGION_WIDTH;
 
 pub fn make_icon_paint(color: vg::Color, width: f32) -> Paint {
     let mut icon_paint = vg::Paint::color(color);
@@ -77,7 +77,7 @@ pub fn width_to_grid_width(width: f32) -> u8 {
         MAX_GRID_WIDTH,
         max(
             MIN_GRID_WIDTH,
-            ((width - NON_GRID_WIDTH - PADDING * 3.0) / (grid::NODE_SIZE + PADDING)) as u8,
+            ((width - NON_GRID_WIDTH) / (grid::NODE_SIZE + PADDING)) as u8,
         ),
     )
 }
@@ -87,7 +87,7 @@ pub fn height_to_grid_height(height: f32) -> u8 {
         MAX_GRID_HEIGHT,
         max(
             MIN_GRID_HEIGHT,
-            ((height - NON_GRID_HEIGHT - PADDING * 2.0) / (grid::NODE_SIZE + PADDING)) as u8,
+            ((height - NON_GRID_HEIGHT) / (grid::NODE_SIZE + PADDING)) as u8,
         ),
     )
 }
@@ -97,11 +97,11 @@ pub fn vizia_state(grid_params: Arc<GridParams>) -> Arc<ViziaState> {
         let width: u32 = ((grid::NODE_SIZE + PADDING)
             * (grid_params.width.load(Ordering::Relaxed) as f32)
             + NON_GRID_WIDTH
-            + PADDING * 2.0) as u32;
+            + PADDING) as u32;
         let height: u32 = ((grid::NODE_SIZE + PADDING)
             * (grid_params.height.load(Ordering::Relaxed) as f32)
             + NON_GRID_HEIGHT
-            + PADDING * 2.0) as u32;
+            + PADDING) as u32;
         (width, height)
     })
 }
@@ -119,7 +119,7 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
             data.clone().build(cx);
 
             HStack::new(cx, |cx| {
-                let button_dimensions = BOTTOM_REGION_HEIGHT - PADDING * 2.0;
+                let button_dimensions = BOTTOM_REGION_HEIGHT - PADDING;
 
                 TuningLearnButton::new(
                     cx,
@@ -136,13 +136,13 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
             .bottom(Units::Pixels(PADDING))
             .left(Units::Pixels(PADDING))
             .right(Units::Pixels(PADDING))
-            .height(Units::Pixels(BOTTOM_REGION_HEIGHT - 2.0 * PADDING));
+            .height(Units::Pixels(BOTTOM_REGION_HEIGHT - PADDING));
 
             Lattice::new(cx, Data::params, Data::voices_output)
                 .position_type(PositionType::SelfDirected)
                 .bottom(Units::Pixels(BOTTOM_REGION_HEIGHT))
-                .left(Units::Pixels(PADDING))
-                .top(Units::Pixels(PADDING))
+                .left(Units::Pixels(0.0))
+                .top(Units::Pixels(0.0))
                 .right(Units::Pixels(RIGHT_REGION_WIDTH));
 
             NoteSpectrum::new(
@@ -154,8 +154,8 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
             .top(Units::Pixels(PADDING))
             .right(Units::Pixels(PADDING))
             .left(Units::Stretch(1.0))
-            .bottom(Units::Pixels(BOTTOM_REGION_HEIGHT))
-            .width(Units::Pixels(RIGHT_REGION_WIDTH - PADDING * 2.0));
+            .bottom(Units::Pixels(BOTTOM_REGION_HEIGHT + PADDING))
+            .width(Units::Pixels(RIGHT_REGION_WIDTH - PADDING));
 
             Resizer::new(cx)
                 .position_type(PositionType::SelfDirected)
@@ -163,8 +163,8 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
                 .bottom(Units::Pixels(PADDING))
                 .top(Units::Stretch(1.0))
                 .left(Units::Stretch(1.0))
-                .width(Units::Pixels(RIGHT_REGION_WIDTH - PADDING * 2.0))
-                .height(Units::Pixels(BOTTOM_REGION_HEIGHT - PADDING * 2.0));
+                .width(Units::Pixels(RIGHT_REGION_WIDTH - PADDING))
+                .height(Units::Pixels(BOTTOM_REGION_HEIGHT - PADDING));
         },
     )
 }

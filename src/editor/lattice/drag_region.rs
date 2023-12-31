@@ -4,7 +4,6 @@ use crate::editor::lattice::LatticeEvent;
 use crate::editor::*;
 use crate::GridParams;
 
-
 use nih_plug_vizia::vizia::vg;
 use nih_plug_vizia::widgets::ParamEvent;
 use std::sync::Arc;
@@ -215,7 +214,7 @@ impl View for DragRegion {
 
             canvas.stroke_path(
                 &mut icon_path,
-                &make_icon_paint(color, PADDING * 3.0 * cx.scale_factor() as f32),
+                &make_icon_paint(color, PADDING * 2.5 * cx.scale_factor() as f32),
             );
         }
     }
