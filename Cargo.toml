@@ -18,11 +18,11 @@ crate-type = ["cdylib"]
 # thread in debug builds.
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = [
     "assert_process_allocs",
-], rev = "cd5b2592a80c2981f038c36fd0c530771a2d7414" }
+], rev = "96d4e34ac8006d6896684c88c9936eecb7d297d4" }
 # Uncomment the below line to disable the on-by-default VST3 feature to remove
 # the GPL compatibility requirement
 # nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default_features = false, features = ["assert_process_allocs"] }
-nih_plug_vizia = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "cd5b2592a80c2981f038c36fd0c530771a2d7414" }
+nih_plug_vizia = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "96d4e34ac8006d6896684c88c9936eecb7d297d4" }
 rtrb = "0.2.3"
 heapless = "0.7.16"
 triple_buffer = "7.0.0"
