@@ -248,7 +248,7 @@ impl Default for MidiLattice {
 }
 
 impl Plugin for MidiLattice {
-    const NAME: &'static str = "Midi Lattice";
+    const NAME: &'static str = "MIDI Lattice";
     const VENDOR: &'static str = "Yan Han";
     const URL: &'static str = env!("CARGO_PKG_HOMEPAGE");
     const EMAIL: &'static str = "yanhan13@gmail.com";
@@ -301,7 +301,7 @@ impl Plugin for MidiLattice {
         while let Some(event) = context.next_event() {
             update_midi_voices(&mut self.voices, event);
 
-            nih_log!("event: {}", DisplayNoteEvent(event));
+            //nih_log!("event: {}", DisplayNoteEvent(event));
             context.send_event(event);
 
             event_counter += 1;
@@ -313,13 +313,6 @@ impl Plugin for MidiLattice {
             for _v in self.voices.values() {
                 //nih_log!("--- voice: {}", v);
             }
-            /*
-            nih_log!(
-                "*** process() finished in {} us with {} events",
-                start_time.elapsed().as_micros(),
-                event_counter
-            );
-            */
         }
 
         ProcessStatus::Normal
@@ -334,12 +327,10 @@ impl Plugin for MidiLattice {
         // Resize buffers and perform other potentially expensive initialization operations here.
         // The `reset()` function is always called right after this function. You can remove this
         // function if you do not need it.
-        nih_log!("plugin initialized");
         true
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        nih_log!("editor() called");
         editor::create(editor::Data::new(
             self.params.clone(),
             self.voices_output.clone(),
@@ -359,7 +350,7 @@ impl ClapPlugin for MidiLattice {
     });
 
     const CLAP_FEATURES: &'static [ClapFeature] = &[
-        ClapFeature::Instrument,
+        ClapFeature::NoteEffect,
         ClapFeature::Analyzer,
         ClapFeature::Utility,
     ];
@@ -369,7 +360,7 @@ impl Vst3Plugin for MidiLattice {
     const VST3_CLASS_ID: [u8; 16] = *b"midi_lattice0000";
 
     const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[
-        Vst3SubCategory::Instrument,
+        Vst3SubCategory::Fx,
         Vst3SubCategory::Analyzer,
         Vst3SubCategory::Tools,
     ];

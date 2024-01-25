@@ -19,7 +19,7 @@ pub static BASE_COLOR: vg::Color = grey(0x60 as f32 / MAX_COLOR_VALUE);
 // For highlighted nodes, and moused over buttons.
 pub static HIGHLIGHT_COLOR: vg::Color = grey(0x80 as f32 / MAX_COLOR_VALUE);
 
-// For text, or fucused buttons
+// For text, or focused buttons
 pub static TEXT_COLOR: vg::Color = grey(0xff as f32 / MAX_COLOR_VALUE);
 
 // Colors for overlay buttons on lattice, which are only shown on mouse over.
