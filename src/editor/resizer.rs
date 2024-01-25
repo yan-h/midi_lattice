@@ -53,7 +53,6 @@ impl View for Resizer {
             WindowEvent::MouseDown(MouseButton::Left) => {
                 cx.capture();
                 cx.set_active(true);
-                nih_log!("down");
 
                 self.drag_active = true;
                 self.start_scale_factor = cx.user_scale_factor();
@@ -64,7 +63,6 @@ impl View for Resizer {
                 );
             }
             WindowEvent::MouseUp(MouseButton::Left) => {
-                nih_log!("up");
                 if self.drag_active {
                     cx.release();
                     cx.set_active(false);

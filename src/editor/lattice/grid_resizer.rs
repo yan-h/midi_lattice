@@ -46,7 +46,6 @@ impl View for GridResizer {
                 self.lattice_mouse_down = true;
             }
             LatticeEvent::MouseUpToChild => {
-                //meta.consume();
                 self.lattice_mouse_down = false;
             }
             _ => {}

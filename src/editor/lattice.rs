@@ -1,6 +1,7 @@
 use crate::MidiLatticeParams;
 use crate::Voices;
 
+use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 use std::sync::{Arc, Mutex};
@@ -23,6 +24,14 @@ pub mod grid_resizer;
 
 pub struct Lattice {
     mouse_over: bool,
+}
+
+pub enum LatticeControlState {
+    Nothing,     // Mouse is not over any zone
+    HoverDrag,   // Mouse is over the "drag" zone
+    HoverResize, // Mouse is over the "resize" zone
+    Drag,        // Mouse is down after being over the "drag" zone
+    Resize,      // Mouse is down after being over the "resize" zone
 }
 
 impl Lattice {
@@ -53,12 +62,12 @@ impl Lattice {
 
                 GridResizer::new(cx, params.map(|p| p.grid_params.clone()))
                     .position_type(PositionType::SelfDirected)
-                    .bottom(Units::Pixels(PADDING))
-                    .right(Units::Pixels(PADDING))
+                    .bottom(Units::Pixels(PADDING * 2.0))
+                    .right(Units::Pixels(PADDING * 2.0))
                     .left(Units::Stretch(1.0))
                     .top(Units::Stretch(1.0))
-                    .width(Units::Pixels(NODE_SIZE * 1.3))
-                    .height(Units::Pixels(NODE_SIZE * 1.3))
+                    .width(Units::Pixels(NODE_SIZE * 1.5))
+                    .height(Units::Pixels(NODE_SIZE * 1.5))
                     .visibility(Visibility::Hidden);
             },
         )
@@ -77,6 +86,8 @@ enum LatticeEvent {
     MouseUpToChild,
 }
 
+pub struct LatticeControlEvent(LatticeControlState);
+
 impl View for Lattice {
     fn element(&self) -> Option<&'static str> {
         Some("lattice")
@@ -86,8 +97,7 @@ impl View for Lattice {
         // Notify children when the mouse moves over or leaves the lattice
         event.map(|window_event, _meta| match *window_event {
             WindowEvent::MouseMove(x, y) => {
-                // If the mouse entered or left the bounding box, notify the subtree
-                if intersects_box(cx.bounds(), (x, y)) {
+                if intersects_box(cx.bounds().shrink_sides(60.0, 60.0, 15.0, 15.0), (x, y)) {
                     if !self.mouse_over {
                         cx.emit_custom(
                             Event::new(LatticeEvent::MouseOver).propagate(Propagation::Subtree),
@@ -115,7 +125,10 @@ impl View for Lattice {
             LatticeEvent::MouseUpFromChild => {
                 if self.mouse_over {
                     self.mouse_over = false;
-                    if !intersects_box(cx.bounds(), (cx.mouse().cursorx, cx.mouse().cursory)) {
+                    if !intersects_box(
+                        cx.bounds().shrink_sides(60.0, 60.0, 15.0, 15.0),
+                        (cx.mouse().cursorx, cx.mouse().cursory),
+                    ) {
                         cx.emit_custom(
                             Event::new(LatticeEvent::MouseOut).propagate(Propagation::Subtree),
                         );
