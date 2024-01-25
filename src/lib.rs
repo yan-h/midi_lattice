@@ -248,7 +248,7 @@ impl Default for MidiLattice {
 }
 
 impl Plugin for MidiLattice {
-    const NAME: &'static str = "Midi Lattice";
+    const NAME: &'static str = "MIDI Lattice";
     const VENDOR: &'static str = "Yan Han";
     const URL: &'static str = env!("CARGO_PKG_HOMEPAGE");
     const EMAIL: &'static str = "yanhan13@gmail.com";
