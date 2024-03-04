@@ -199,7 +199,6 @@ impl Grid {
 
 /// Arguments used to draw the grid. Passed into sub-methods of [`Grid::draw()`].
 struct DrawGridArgs {
-    scale: f32,
     scaled_node_size: f32,
     scaled_padding: f32,
     scaled_corner_radius: f32,
@@ -246,7 +245,6 @@ impl DrawGridArgs {
             (cx.bounds().width() - scaled_padding * (grid_width as f32 + 1.0)) / grid_width as f32;
 
         DrawGridArgs {
-            scale: cx.scale_factor(),
             scaled_node_size,
             scaled_padding,
             scaled_corner_radius: CORNER_RADIUS * cx.scale_factor(),

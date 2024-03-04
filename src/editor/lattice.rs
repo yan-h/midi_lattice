@@ -1,37 +1,24 @@
 use crate::MidiLatticeParams;
 use crate::Voices;
 
-use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
-use nih_plug_vizia::vizia::vg;
 use std::sync::{Arc, Mutex};
 use triple_buffer::Output;
 
-use crate::editor::{CORNER_RADIUS, PADDING};
+use crate::editor::PADDING;
 
 use self::drag_region::DragRegion;
 use self::grid::Grid;
 use self::grid::NODE_SIZE;
 use self::grid_resizer::GridResizer;
 
-use super::color::BACKGROUND_COLOR;
-use super::color::TEXT_COLOR;
 use super::intersects_box;
-use crate::editor::color::BASE_COLOR;
 mod drag_region;
 pub mod grid;
 pub mod grid_resizer;
 
 pub struct Lattice {
     mouse_over: bool,
-}
-
-pub enum LatticeControlState {
-    Nothing,     // Mouse is not over any zone
-    HoverDrag,   // Mouse is over the "drag" zone
-    HoverResize, // Mouse is over the "resize" zone
-    Drag,        // Mouse is down after being over the "drag" zone
-    Resize,      // Mouse is down after being over the "resize" zone
 }
 
 impl Lattice {
@@ -86,8 +73,6 @@ enum LatticeEvent {
     MouseUpToChild,
 }
 
-pub struct LatticeControlEvent(LatticeControlState);
-
 impl View for Lattice {
     fn element(&self) -> Option<&'static str> {
         Some("lattice")
@@ -141,6 +126,4 @@ impl View for Lattice {
             _ => {}
         });
     }
-
-    fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {}
 }

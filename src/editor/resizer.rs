@@ -1,7 +1,6 @@
 //! A resize handle for uniformly scaling a plugin GUI.
 
 use crate::editor::{intersects_box, CORNER_RADIUS, PADDING};
-use nih_plug::prelude::*;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
 

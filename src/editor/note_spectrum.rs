@@ -10,7 +10,7 @@ use triple_buffer::Output;
 
 use crate::editor::color::*;
 
-use crate::editor::{CORNER_RADIUS, PADDING};
+use crate::editor::CORNER_RADIUS;
 
 pub struct NoteSpectrum {
     params: Arc<GridParams>,
@@ -115,7 +115,7 @@ impl View for NoteSpectrum {
                 cx.bounds().y + cx.bounds().height() - pitch_idx * cx.bounds().height(),
             );
             notch_path.line_to(
-                cx.bounds().x + cx.bounds().width(), // + cx.bounds().width() * 0.75,
+                cx.bounds().x + cx.bounds().width(),
                 cx.bounds().y + cx.bounds().height() - pitch_idx * cx.bounds().height(),
             );
 

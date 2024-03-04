@@ -1,4 +1,3 @@
-use crate::midi::DisplayNoteEvent;
 use crate::midi::{MidiVoice, VoiceKey};
 use heapless::FnvIndexMap;
 use midi::update_midi_voices;

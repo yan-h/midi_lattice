@@ -23,9 +23,9 @@ pub static HIGHLIGHT_COLOR: vg::Color = grey(0x80 as f32 / MAX_COLOR_VALUE);
 pub static TEXT_COLOR: vg::Color = grey(0xff as f32 / MAX_COLOR_VALUE);
 
 // Colors for overlay buttons on lattice, which are only shown on mouse over.
-pub static OVERLAY_COLOR_0: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 0.4);
-pub static OVERLAY_COLOR_1: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 0.8);
-pub static OVERLAY_COLOR_2: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 1.0);
+pub static OVERLAY_COLOR_BASE: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 0.4);
+pub static OVERLAY_COLOR_HOVER: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 0.8);
+pub static OVERLAY_COLOR_PRESS: vg::Color = vg::Color::rgbaf(1.0, 1.0, 1.0, 1.0);
 
 // Maps channels to static colors
 // Note: channel numbers here are 1 lower than the MIDI convention they're zero-indexed

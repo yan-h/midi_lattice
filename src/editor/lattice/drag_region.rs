@@ -205,11 +205,11 @@ impl View for DragRegion {
             icon_path.close();
 
             let color = if self.drag_active {
-                OVERLAY_COLOR_2
+                OVERLAY_COLOR_PRESS
             } else if self.mouse_over && !self.lattice_mouse_down {
-                OVERLAY_COLOR_1
+                OVERLAY_COLOR_HOVER
             } else {
-                OVERLAY_COLOR_0
+                OVERLAY_COLOR_BASE
             };
 
             canvas.stroke_path(
