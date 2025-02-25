@@ -67,9 +67,9 @@ pub fn note_color(channel: u8, pitch: f32, darkest_pitch: f32, brightest_pitch: 
             ((pitch.min(brightest_pitch).max(darkest_pitch) - darkest_pitch)
                 / (brightest_pitch - darkest_pitch).max(0.01)) as f64;
         return lch_to_vg_color(Lch::new(
-            25.0 + pitch_color_index * 55.0,
-            65.0 - pitch_color_index * 35.0,
-            (-20.0 + pitch_color_index * 110.0).rem_euclid(360.0),
+            0.0 + pitch_color_index * 80.0,
+            85.0 - pitch_color_index * 60.0,
+            (-100.0 + pitch_color_index * 190.0).rem_euclid(360.0),
         ));
     } else if channel == 14 {
         return HIGHLIGHT_COLOR;

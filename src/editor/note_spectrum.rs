@@ -55,7 +55,7 @@ impl View for NoteSpectrum {
         canvas.fill_path(&background_path, &vg::Paint::color(BASE_COLOR));
 
         let min_pitch: f32 = 60.0 - 12.0 * 3.0;
-        let max_pitch: f32 = 60.0 + 12.0 * 3.0;
+        let max_pitch: f32 = 60.0 + 12.0 * 4.0;
 
         // Draw notes
         let mut voices_output = self.voices_output.lock().unwrap();
