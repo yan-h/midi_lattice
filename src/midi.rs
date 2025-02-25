@@ -1,6 +1,4 @@
 use core::hash::{Hash, Hasher};
-use hash32;
-use hash32_derive::Hash32;
 use nih_plug::midi::NoteEvent;
 use nih_plug::{nih_error, nih_log};
 
@@ -19,20 +17,10 @@ pub struct MidiVoice {
     pitch_class: PitchClass,
 }
 
-impl Hash for MidiVoice {
+impl core::hash::Hash for MidiVoice {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.note.hash(state);
         self.channel.hash(state);
-    }
-}
-
-impl hash32::Hash for MidiVoice {
-    fn hash<H>(&self, state: &mut H)
-    where
-        H: hash32::Hasher,
-    {
-        hash32::Hash::hash(&self.note, state);
-        hash32::Hash::hash(&self.channel, state);
     }
 }
 
@@ -92,7 +80,7 @@ impl Display for MidiVoice {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Hash, Copy, Clone, Hash32)]
+#[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
 pub struct VoiceKey {
     /// The note's channel, in `0..16`.
     pub channel: u8,

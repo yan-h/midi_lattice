@@ -24,10 +24,8 @@ nih_plug = { git = "https://github.com/yan-h/nih-plug.git", rev = "1eb73bf2d5d3f
 # nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default_features = false, features = ["assert_process_allocs"] }
 nih_plug_vizia = { git = "https://github.com/yan-h/nih-plug.git", rev = "1eb73bf2d5d3f7f3b9bf1229b29f12217f3ff111" }
 rtrb = "0.2.3"
-heapless = "0.7.16"
+heapless = "0.8.0"
 triple_buffer = "7.0.0"
-hash32 = "0.2.1"
-hash32-derive = "0.1.1"
 color_space = "0.5.3"
 once_cell = "1.18.0"
 

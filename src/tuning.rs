@@ -227,8 +227,7 @@ impl PrimeCountVector {
         NoteNameInfo {
             letter_name: NOTE_NAMES[letter_names_idx.rem_euclid(7) as usize],
             sharps_or_flats: letter_names_idx.div_euclid(7),
-            syntonic_commas: -self.fives,
-            septimal_commas: -self.sevens,
+            syntonic_commas: -self.fives
         }
     }
 }
@@ -243,10 +242,7 @@ pub struct NoteNameInfo {
     pub sharps_or_flats: i32,
 
     /// Number of syntonic commas (81/80) added or subtracted
-    pub syntonic_commas: i32,
-
-    /// Number of septimal commas (64/63) added or subtracted
-    pub septimal_commas: i32,
+    pub syntonic_commas: i32
 }
 
 impl NoteNameInfo {
