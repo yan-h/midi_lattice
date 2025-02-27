@@ -194,6 +194,7 @@ impl Display for PitchClassDistance {
 
 /// Represents an abstract pitch class as its number of prime factors of 3, 5 and 7
 /// C = (0, 0, 0)
+#[derive(Clone, Copy)]
 pub struct PrimeCountVector {
     pub threes: i32,
     pub fives: i32,
@@ -350,5 +351,84 @@ mod tests {
             PitchClass::from_microcents(1_199_999_999).multiply(-1_000_000_000),
             PitchClass::from_microcents(1_000_000_000)
         );
+    }
+}
+
+// Returns whether a pitch class matches (within a tolerance) any in a list of sorted pitch classes
+pub fn pitch_class_matches_any_in_sorted_vec(
+    pitch_class: PitchClass,
+    sorted_pitch_classes: &Vec<PitchClass>,
+    tuning_tolerance: PitchClassDistance,
+) -> bool {
+    if sorted_pitch_classes.len() == 0 {
+        return false;
+    }
+
+    // Lowest pitch class that could match
+    let candidate_idx: usize = sorted_pitch_classes
+        .partition_point(|pc: &PitchClass| *pc < pitch_class - PitchClass::from(tuning_tolerance));
+
+    if candidate_idx == sorted_pitch_classes.len() {
+        return sorted_pitch_classes[0].distance_to(pitch_class) <= tuning_tolerance;
+    }
+
+    return sorted_pitch_classes[candidate_idx].distance_to(pitch_class) <= tuning_tolerance;
+}
+
+#[cfg(test)]
+mod pitch_class_matches_any_in_sorted_vec_tests {
+    use crate::{
+        tuning::pitch_class_matches_any_in_sorted_vec,
+        tuning::{PitchClass, PitchClassDistance, OCTAVE_MICROCENTS},
+    };
+
+    #[test]
+    fn matches_distance_less_than_or_equal_to_tolerance() {
+        assert!(pitch_class_matches_any_in_sorted_vec(
+            PitchClass::from_microcents(700_000_000),
+            &vec![PitchClass::from_microcents(701_000_000)],
+            PitchClassDistance::from_microcents(1_000_000)
+        ));
+        assert!(!pitch_class_matches_any_in_sorted_vec(
+            PitchClass::from_microcents(700_000_000),
+            &vec![PitchClass::from_microcents(701_000_001)],
+            PitchClassDistance::from_microcents(1_000_000)
+        ));
+    }
+
+    #[test]
+    fn matches_across_zero() {
+        assert!(pitch_class_matches_any_in_sorted_vec(
+            PitchClass::from_microcents(0),
+            &vec![PitchClass::from_microcents(OCTAVE_MICROCENTS - 1)],
+            PitchClassDistance::from_microcents(100)
+        ));
+        assert!(pitch_class_matches_any_in_sorted_vec(
+            PitchClass::from_microcents(OCTAVE_MICROCENTS - 1),
+            &vec![PitchClass::from_microcents(1)],
+            PitchClassDistance::from_microcents(100)
+        ));
+    }
+
+    #[test]
+    fn matches_across_zero_many_elements() {
+        assert!(pitch_class_matches_any_in_sorted_vec(
+            PitchClass::from_microcents(0),
+            &vec![
+                PitchClass::from_microcents(400_000_000),
+                PitchClass::from_microcents(700_000_000),
+                PitchClass::from_microcents(OCTAVE_MICROCENTS - 1)
+            ],
+            PitchClassDistance::from_microcents(100)
+        ));
+        assert!(pitch_class_matches_any_in_sorted_vec(
+            PitchClass::from_microcents(OCTAVE_MICROCENTS - 1),
+            &vec![
+                PitchClass::from_microcents(1),
+                PitchClass::from_microcents(400_000_000),
+                PitchClass::from_microcents(700_000_000),
+            ],
+            PitchClassDistance::from_microcents(100)
+        ));
     }
 }

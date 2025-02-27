@@ -6,10 +6,7 @@ use crate::assets;
 use crate::editor::color::*;
 use crate::editor::make_icon_paint;
 use crate::midi::MidiVoice;
-use crate::tuning::NoteNameInfo;
-use crate::tuning::PitchClass;
-use crate::tuning::PitchClassDistance;
-use crate::tuning::PrimeCountVector;
+use crate::tuning::*;
 
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::vizia::vg;
@@ -197,12 +194,8 @@ impl Grid {
     }
 }
 
-/// Arguments used to draw the grid. Passed into sub-methods of [`Grid::draw()`].
-struct DrawGridArgs {
-    scaled_node_size: f32,
-    scaled_padding: f32,
-    scaled_corner_radius: f32,
-    bounds: BoundingBox,
+// Contains all plugin parameters needed for drawing the grid
+struct GridParams {
     grid_width: i32,
     grid_height: i32,
     grid_x: f32,
@@ -211,19 +204,54 @@ struct DrawGridArgs {
     show_z_axis: ShowZAxis,
     darkest_pitch: f32,
     brightest_pitch: f32,
-    sorted_voices: Vec<Voice>,
     c_offset: PitchClass,
     three_tuning: PitchClass,
     five_tuning: PitchClass,
     seven_tuning: PitchClass,
     tuning_tolerance: PitchClassDistance,
+}
+
+impl GridParams {
+    fn new(params: &MidiLatticeParams) -> GridParams {
+        GridParams {
+            grid_width: params.grid_params.width.load(Ordering::Relaxed) as i32,
+            grid_height: params.grid_params.height.load(Ordering::Relaxed) as i32,
+            grid_x: params.grid_params.x.value(),
+            grid_y: params.grid_params.y.value(),
+            grid_z: params.grid_params.z.value(),
+            show_z_axis: params.grid_params.show_z_axis.value(),
+            darkest_pitch: params.grid_params.darkest_pitch.value(),
+            brightest_pitch: params.grid_params.brightest_pitch.value(),
+            c_offset: PitchClass::from_cents_f32(params.tuning_params.c_offset.value()),
+            three_tuning: PitchClass::from_cents_f32(params.tuning_params.three.value()),
+            five_tuning: PitchClass::from_cents_f32(params.tuning_params.five.value()),
+            seven_tuning: PitchClass::from_cents_f32(params.tuning_params.seven.value()),
+            tuning_tolerance: PitchClassDistance::from_cents_f32(
+                params.tuning_params.tolerance.value(),
+            ),
+        }
+    }
+}
+
+/// Arguments used to draw the grid. Passed into sub-methods of [`Grid::draw()`].
+struct DrawGridArgs {
+    scaled_node_size: f32,
+    scaled_padding: f32,
+    scaled_corner_radius: f32,
+    bounds: BoundingBox,
+    sorted_voices: Vec<Voice>,
     font_id: Option<FontId>,
     mono_font_id: Option<FontId>,
     highlighted_pitch_classes: Vec<PitchClass>,
 }
 
 impl DrawGridArgs {
-    fn new(grid: &Grid, cx: &mut DrawContext, canvas: &mut Canvas) -> DrawGridArgs {
+    fn new(
+        grid: &Grid,
+        grid_params: &GridParams,
+        cx: &mut DrawContext,
+        canvas: &mut Canvas,
+    ) -> DrawGridArgs {
         let (font_id, mono_font_id): (Option<FontId>, Option<FontId>) =
             grid.load_and_get_fonts(canvas);
 
@@ -236,35 +264,19 @@ impl DrawGridArgs {
             grid.update_and_get_highlighted_pitch_classes(&sorted_voices, highlight_duration);
 
         let scaled_padding = PADDING * cx.scale_factor();
-        let grid_width = grid.params.grid_params.width.load(Ordering::Relaxed) as i32;
-        let grid_height = grid.params.grid_params.height.load(Ordering::Relaxed) as i32;
 
         // We can't just use `NODE_SIZE` here because that turns out to be slightly too big in
         // practice. Not sure why. Calculating it off the actual width/height works better.
-        let scaled_node_size =
-            (cx.bounds().width() - scaled_padding * (grid_width as f32 + 1.0)) / grid_width as f32;
+        let scaled_node_size = (cx.bounds().width()
+            - scaled_padding * (grid_params.grid_width as f32 + 1.0))
+            / grid_params.grid_width as f32;
 
         DrawGridArgs {
             scaled_node_size,
             scaled_padding,
             scaled_corner_radius: CORNER_RADIUS * cx.scale_factor(),
             bounds: cx.bounds(),
-            grid_width,
-            grid_height,
-            grid_x: grid.params.grid_params.x.value(),
-            grid_y: grid.params.grid_params.y.value(),
-            grid_z: grid.params.grid_params.z.value(),
-            show_z_axis: grid.params.grid_params.show_z_axis.value(),
-            darkest_pitch: grid.params.grid_params.darkest_pitch.value(),
-            brightest_pitch: grid.params.grid_params.brightest_pitch.value(),
             sorted_voices,
-            c_offset: PitchClass::from_cents_f32(grid.params.tuning_params.c_offset.value()),
-            three_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.three.value()),
-            five_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.five.value()),
-            seven_tuning: PitchClass::from_cents_f32(grid.params.tuning_params.seven.value()),
-            tuning_tolerance: PitchClassDistance::from_cents_f32(
-                grid.params.tuning_params.tolerance.value(),
-            ),
             font_id,
             mono_font_id,
             highlighted_pitch_classes,
@@ -287,6 +299,7 @@ struct DrawNodeArgs {
 
 impl DrawNodeArgs {
     fn new(
+        params: &GridParams,
         args: &DrawGridArgs,
         base_x: i32,
         base_y: i32,
@@ -296,26 +309,26 @@ impl DrawNodeArgs {
         let (draw_node_x, draw_node_y): (f32, f32) = (
             args.bounds.x
                 + (args.scaled_padding
-                    + (base_x as f32 - args.grid_x.rem_euclid(1.0))
+                    + (base_x as f32 - params.grid_x.rem_euclid(1.0))
                         * (args.scaled_node_size + args.scaled_padding)),
             args.bounds.y
                 + (args.scaled_padding
-                    + ((base_y as f32 + args.grid_y.rem_euclid(1.0))
+                    + ((base_y as f32 + params.grid_y.rem_euclid(1.0))
                         * (args.scaled_node_size + args.scaled_padding))),
         );
 
         // Pitch class represented by this node
         let pitch_class: PitchClass =
-            primes.pitch_class(args.three_tuning, args.five_tuning, args.seven_tuning)
-                + args.c_offset;
+            primes.pitch_class(params.three_tuning, params.five_tuning, params.seven_tuning)
+                + params.c_offset;
 
         let matching_voices =
-            get_matching_voices(pitch_class, &args.sorted_voices, args.tuning_tolerance);
+            get_matching_voices(pitch_class, &args.sorted_voices, params.tuning_tolerance);
 
-        let highlighted = has_matching_pitch_class(
+        let highlighted = pitch_class_matches_any_in_sorted_vec(
             pitch_class,
             &args.highlighted_pitch_classes,
-            args.tuning_tolerance,
+            params.tuning_tolerance,
         );
 
         let note_name_info = primes.note_name_info();
@@ -328,8 +341,8 @@ impl DrawNodeArgs {
                 colors.push(note_color(
                     v.get_channel(),
                     v.get_pitch(),
-                    args.darkest_pitch,
-                    args.brightest_pitch,
+                    params.darkest_pitch,
+                    params.brightest_pitch,
                 ));
             } else if v.get_channel() == 14 {
                 draw_outline = true;
@@ -343,25 +356,8 @@ impl DrawNodeArgs {
         let draw = match base_z {
             // Always draw main nodes
             0 => true,
-            // Nodes that aren't at zero on the Z axis have additional logic
-            -1 | 1 => {
-                if matching_voices.len() != 0 || highlighted {
-                    match args.show_z_axis {
-                        ShowZAxis::Yes => true,
-                        ShowZAxis::No => false,
-                        ShowZAxis::Auto => {
-                            // Whether the seventh harmonic is equal to the meantone minor seventh
-                            // i.e. whether it's equal to two perfect fourths
-                            let dependent_seven = (args.three_tuning.multiply(-2))
-                                .distance_to(args.seven_tuning)
-                                <= args.tuning_tolerance;
-                            !dependent_seven
-                        }
-                    }
-                } else {
-                    false
-                }
-            }
+            // Nodes that aren't at zero on the Z axis are only drawn when they match a note
+            -1 | 1 => matching_voices.len() != 0 || highlighted,
             _ => false,
         };
 
@@ -470,13 +466,14 @@ const RIGHT: f32 = PI * 2.0;
 /// If smaller nodes for 7 are displayed, this node changes appearance to make room.
 fn draw_node_zero_z(
     canvas: &mut Canvas,
+    params: &GridParams,
     args: &DrawGridArgs,
     node_args: &DrawNodeArgs,
     draw_z_pos: bool,
     draw_z_neg: bool,
 ) {
     draw_main_node_square(canvas, args, node_args);
-    draw_note_name(canvas, args, node_args, draw_z_pos, draw_z_neg);
+    draw_note_name(canvas, params, args, node_args, draw_z_pos, draw_z_neg);
     draw_tuning_cents(canvas, args, node_args, draw_z_neg);
     if draw_z_pos {
         remove_top_right_corner(canvas, args, node_args);
@@ -530,6 +527,7 @@ fn draw_node_zero_z(
 
     fn draw_note_name(
         canvas: &mut Canvas,
+        params: &GridParams,
         args: &DrawGridArgs,
         node_args: &DrawNodeArgs,
         draw_z_pos: bool,
@@ -538,8 +536,11 @@ fn draw_node_zero_z(
         let mut text_paint = vg::Paint::color(TEXT_COLOR);
         text_paint.set_text_align(vg::Align::Right);
 
-        let show_syntonic_commas =
-            args.three_tuning.multiply(4).distance_to(args.five_tuning) > args.tuning_tolerance;
+        let show_syntonic_commas = params
+            .three_tuning
+            .multiply(4)
+            .distance_to(params.five_tuning)
+            > params.tuning_tolerance;
         let max_accidental_str_len = (if show_syntonic_commas {
             node_args.note_name_info.syntonic_commas.abs()
         } else {
@@ -978,81 +979,147 @@ impl View for Grid {
 
     fn event(&mut self, _cx: &mut EventContext, _event: &mut Event) {}
 
-    // TODO: factor this out into methods
     fn draw(&self, cx: &mut DrawContext, canvas: &mut Canvas) {
         let _start_time = Instant::now();
 
-        let args: DrawGridArgs = DrawGridArgs::new(self, cx, canvas);
+        let params: GridParams = GridParams::new(&self.params);
+        let args: DrawGridArgs = DrawGridArgs::new(self, &params, cx, canvas);
 
         prepare_canvas(cx, canvas, &args);
 
-        // When grid x or y is not a round number, we need to add a row or column to avoid blanks
-        let (extra_right, extra_top) = (
-            if args.grid_x == args.grid_x.round() {
-                0
-            } else {
-                1
-            },
-            if args.grid_y == args.grid_y.round() {
-                0
-            } else {
-                1
-            },
-        );
+        let grid_pitches: HashMap<PhysicalGridIndex, PcvsAtPhysicalGridIndex> =
+            get_grid_indexed_prime_count_vectors(&params);
 
-        // Offsets for the coordinates of C on the grid (makes it as close as possible to the center)
-        let (x_offset, y_offset) = (
-            ((args.grid_width - 1) / 2) as i32,
-            (args.grid_height / 2) as i32,
-        );
+        for (idx, pcvs) in grid_pitches.into_iter() {
+            let node_args_zero_z = DrawNodeArgs::new(&params, &args, idx.x, idx.y, 0, pcvs.zero_z);
 
-        // x = fives
-        for base_x in 0..args.grid_width + extra_right {
-            // y = threes
-            for base_y in -extra_top..args.grid_height {
-                // Draw lattice nodes one by one
-                // z = sevens
-                let make_draw_node_args = |base_z| {
-                    DrawNodeArgs::new(
-                        &args,
-                        base_x,
-                        base_y,
-                        base_z,
-                        PrimeCountVector::new(
-                            y_offset - i32::from(base_y) + args.grid_y.floor() as i32,
-                            i32::from(base_x - x_offset) + args.grid_x.floor() as i32,
-                            base_z + args.grid_z,
-                        ),
-                    )
-                };
-                let (node_args_zero_z, node_args_pos_z, node_args_neg_z) = (
-                    make_draw_node_args(0),
-                    make_draw_node_args(1),
-                    make_draw_node_args(-1),
-                );
+            let pos_z_args: Option<DrawNodeArgs> = pcvs
+                .pos_z
+                .map(|pcv| DrawNodeArgs::new(&params, &args, idx.x, idx.y, 1, pcv));
+            let neg_z_args: Option<DrawNodeArgs> = pcvs
+                .neg_z
+                .map(|pcv| DrawNodeArgs::new(&params, &args, idx.x, idx.y, -1, pcv));
 
-                draw_node_zero_z(
-                    canvas,
-                    &args,
-                    &node_args_zero_z,
-                    node_args_pos_z.draw,
-                    node_args_neg_z.draw,
-                );
-                draw_node_nonzero_z(canvas, &args, &node_args_pos_z);
-                draw_node_nonzero_z(canvas, &args, &node_args_neg_z);
-            }
+            draw_node_zero_z(
+                canvas,
+                &params,
+                &args,
+                &node_args_zero_z,
+                pos_z_args.as_ref().is_some_and(|node_args| node_args.draw),
+                neg_z_args.as_ref().is_some_and(|node_args| node_args.draw),
+            );
+
+            pos_z_args.map(|node_args| draw_node_nonzero_z(canvas, &args, &node_args));
+            neg_z_args.map(|node_args| draw_node_nonzero_z(canvas, &args, &node_args));
         }
 
         finish_canvas(cx, canvas, &args);
-
-        /*
-        nih_log!(
-            "*** draw() finished in {} us",
-            start_time.elapsed().as_micros()
-        );
-        */
     }
 }
+
+// An (x, y) position on the grid, as it appears on the screen
+#[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Debug, Hash)]
+struct PhysicalGridIndex {
+    x: i32,
+    y: i32,
+}
+
+// All of the prime count vectors at a specific physical grid position
+struct PcvsAtPhysicalGridIndex {
+    zero_z: PrimeCountVector,
+    pos_z: Option<PrimeCountVector>,
+    neg_z: Option<PrimeCountVector>,
+}
+
+impl PcvsAtPhysicalGridIndex {
+    fn all_prime_count_vectors(&self) -> Vec<PrimeCountVector> {
+        let mut result = Vec::new();
+        result.push(self.zero_z);
+        self.pos_z.map(|pcv| result.push(pcv));
+        self.neg_z.map(|pcv| result.push(pcv));
+        return result;
+    }
+}
+
+fn get_grid_indexed_prime_count_vectors(
+    params: &GridParams,
+) -> HashMap<PhysicalGridIndex, PcvsAtPhysicalGridIndex> {
+    let show_zs = match params.show_z_axis {
+        ShowZAxis::Yes => true,
+        ShowZAxis::No => false,
+        ShowZAxis::Auto => {
+            // Whether the seventh harmonic is equal to the meantone minor seventh
+            // i.e. whether it's equal to two perfect fourths
+            let dependent_seven = (params.three_tuning.multiply(-2))
+                .distance_to(params.seven_tuning)
+                <= params.tuning_tolerance;
+            !dependent_seven
+        }
+    };
+
+    let mut result = HashMap::new();
+    let (extra_right, extra_top) = (
+        if params.grid_x == params.grid_x.round() {
+            0
+        } else {
+            1
+        },
+        if params.grid_y == params.grid_y.round() {
+            0
+        } else {
+            1
+        },
+    );
+
+    let (ref_pitch_x, ref_pitch_y) = (
+        ((params.grid_width - 1) / 2) as i32,
+        (params.grid_height / 2) as i32,
+    );
+
+    for physical_x in 0..params.grid_width + extra_right {
+        for physical_y in -extra_top..params.grid_height {
+            let threes = ref_pitch_y - i32::from(physical_y) + params.grid_y.floor() as i32;
+            let fives = i32::from(physical_x - ref_pitch_x) + params.grid_x.floor() as i32;
+            result.insert(
+                PhysicalGridIndex {
+                    x: physical_x,
+                    y: physical_y,
+                },
+                PcvsAtPhysicalGridIndex {
+                    zero_z: PrimeCountVector::new(threes, fives, params.grid_z),
+                    pos_z: if show_zs {
+                        Some(PrimeCountVector::new(threes, fives, params.grid_z + 1))
+                    } else {
+                        None
+                    },
+                    neg_z: if show_zs {
+                        Some(PrimeCountVector::new(threes, fives, params.grid_z - 1))
+                    } else {
+                        None
+                    },
+                },
+            );
+        }
+    }
+    result
+}
+
+pub fn get_sorted_grid_pitch_classes(params: &MidiLatticeParams) -> Vec<PitchClass> {
+    let (three_tuning, five_tuning, seven_tuning) = (
+        PitchClass::from_cents_f32(params.tuning_params.three.value()),
+        PitchClass::from_cents_f32(params.tuning_params.five.value()),
+        PitchClass::from_cents_f32(params.tuning_params.seven.value()),
+    );
+    let mut result: Vec<PitchClass> =
+        get_grid_indexed_prime_count_vectors(&GridParams::new(&params))
+            .values()
+            .flat_map(|pcvs| pcvs.all_prime_count_vectors().into_iter())
+            .map(|pcv| pcv.pitch_class(three_tuning, five_tuning, seven_tuning))
+            .collect();
+    result.sort();
+    result
+}
+
 // Helper methods for drawing
 impl Grid {
     /// Retrieves the list of `MidiVoice` from the triple buffer, and returns a vector of `Voice`
@@ -1067,85 +1134,6 @@ impl Grid {
             .collect();
         result.sort_unstable_by(|v1, v2| v1.pitch_class.cmp(&v2.pitch_class));
         result
-    }
-}
-
-// Returns whether a pitch class matches any in a list of sorted pitch classes
-fn has_matching_pitch_class(
-    pitch_class: PitchClass,
-    sorted_pitch_classes: &Vec<PitchClass>,
-    tuning_tolerance: PitchClassDistance,
-) -> bool {
-    if sorted_pitch_classes.len() == 0 {
-        return false;
-    }
-
-    // Lowest pitch class that could match
-    let candidate_idx: usize = sorted_pitch_classes
-        .partition_point(|pc: &PitchClass| *pc < pitch_class - PitchClass::from(tuning_tolerance));
-
-    if candidate_idx == sorted_pitch_classes.len() {
-        return sorted_pitch_classes[0].distance_to(pitch_class) <= tuning_tolerance;
-    }
-
-    return sorted_pitch_classes[candidate_idx].distance_to(pitch_class) <= tuning_tolerance;
-}
-
-#[cfg(test)]
-mod has_matching_pitch_class_tests {
-    use crate::{
-        editor::lattice::grid::has_matching_pitch_class,
-        tuning::{PitchClass, PitchClassDistance, OCTAVE_MICROCENTS},
-    };
-
-    #[test]
-    fn matches_distance_less_than_or_equal_to_tolerance() {
-        assert!(has_matching_pitch_class(
-            PitchClass::from_microcents(700_000_000),
-            &vec![PitchClass::from_microcents(701_000_000)],
-            PitchClassDistance::from_microcents(1_000_000)
-        ));
-        assert!(!has_matching_pitch_class(
-            PitchClass::from_microcents(700_000_000),
-            &vec![PitchClass::from_microcents(701_000_001)],
-            PitchClassDistance::from_microcents(1_000_000)
-        ));
-    }
-
-    #[test]
-    fn matches_across_zero() {
-        assert!(has_matching_pitch_class(
-            PitchClass::from_microcents(0),
-            &vec![PitchClass::from_microcents(OCTAVE_MICROCENTS - 1)],
-            PitchClassDistance::from_microcents(100)
-        ));
-        assert!(has_matching_pitch_class(
-            PitchClass::from_microcents(OCTAVE_MICROCENTS - 1),
-            &vec![PitchClass::from_microcents(1)],
-            PitchClassDistance::from_microcents(100)
-        ));
-    }
-
-    #[test]
-    fn matches_across_zero_many_elements() {
-        assert!(has_matching_pitch_class(
-            PitchClass::from_microcents(0),
-            &vec![
-                PitchClass::from_microcents(400_000_000),
-                PitchClass::from_microcents(700_000_000),
-                PitchClass::from_microcents(OCTAVE_MICROCENTS - 1)
-            ],
-            PitchClassDistance::from_microcents(100)
-        ));
-        assert!(has_matching_pitch_class(
-            PitchClass::from_microcents(OCTAVE_MICROCENTS - 1),
-            &vec![
-                PitchClass::from_microcents(1),
-                PitchClass::from_microcents(400_000_000),
-                PitchClass::from_microcents(700_000_000),
-            ],
-            PitchClassDistance::from_microcents(100)
-        ));
     }
 }
 
