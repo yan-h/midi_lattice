@@ -991,20 +991,20 @@ impl View for Grid {
             get_grid_indexed_prime_count_vectors(&params);
 
         for (idx, pcvs) in grid_pitches.into_iter() {
-            let node_args_zero_z = DrawNodeArgs::new(&params, &args, idx.x, idx.y, 0, pcvs.zero_z);
-
-            let pos_z_args: Option<DrawNodeArgs> = pcvs
-                .pos_z
-                .map(|pcv| DrawNodeArgs::new(&params, &args, idx.x, idx.y, 1, pcv));
-            let neg_z_args: Option<DrawNodeArgs> = pcvs
-                .neg_z
-                .map(|pcv| DrawNodeArgs::new(&params, &args, idx.x, idx.y, -1, pcv));
+            let pos_z_args: Option<DrawNodeArgs> =
+                pcvs.nonzero_z.as_ref().map(|pcvs: &PcvsAtNonzeroZ| {
+                    DrawNodeArgs::new(&params, &args, idx.x, idx.y, 1, pcvs.pos)
+                });
+            let neg_z_args: Option<DrawNodeArgs> =
+                pcvs.nonzero_z.as_ref().map(|pcvs: &PcvsAtNonzeroZ| {
+                    DrawNodeArgs::new(&params, &args, idx.x, idx.y, -1, pcvs.neg)
+                });
 
             draw_node_zero_z(
                 canvas,
                 &params,
                 &args,
-                &node_args_zero_z,
+                &DrawNodeArgs::new(&params, &args, idx.x, idx.y, 0, pcvs.zero_z),
                 pos_z_args.as_ref().is_some_and(|node_args| node_args.draw),
                 neg_z_args.as_ref().is_some_and(|node_args| node_args.draw),
             );
@@ -1017,27 +1017,34 @@ impl View for Grid {
     }
 }
 
-// An (x, y) position on the grid, as it appears on the screen
+/// An (x, y) position on the grid, as it appears on the screen
 #[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Debug, Hash)]
 struct PhysicalGridIndex {
     x: i32,
     y: i32,
 }
 
-// All of the prime count vectors at a specific physical grid position
+/// All of the prime count vectors at a specific physical grid position. Z-index pcvs are only
+/// included if enabled
 struct PcvsAtPhysicalGridIndex {
     zero_z: PrimeCountVector,
-    pos_z: Option<PrimeCountVector>,
-    neg_z: Option<PrimeCountVector>,
+    nonzero_z: Option<PcvsAtNonzeroZ>,
+}
+
+struct PcvsAtNonzeroZ {
+    pos: PrimeCountVector,
+    neg: PrimeCountVector,
 }
 
 impl PcvsAtPhysicalGridIndex {
     fn all_prime_count_vectors(&self) -> Vec<PrimeCountVector> {
         let mut result = Vec::new();
         result.push(self.zero_z);
-        self.pos_z.map(|pcv| result.push(pcv));
-        self.neg_z.map(|pcv| result.push(pcv));
-        return result;
+        self.nonzero_z.as_ref().map(|pcvs| {
+            result.push(pcvs.pos);
+            result.push(pcvs.neg);
+        });
+        result
     }
 }
 
@@ -1087,13 +1094,11 @@ fn get_grid_indexed_prime_count_vectors(
                 },
                 PcvsAtPhysicalGridIndex {
                     zero_z: PrimeCountVector::new(threes, fives, params.grid_z),
-                    pos_z: if show_zs {
-                        Some(PrimeCountVector::new(threes, fives, params.grid_z + 1))
-                    } else {
-                        None
-                    },
-                    neg_z: if show_zs {
-                        Some(PrimeCountVector::new(threes, fives, params.grid_z - 1))
+                    nonzero_z: if show_zs {
+                        Some(PcvsAtNonzeroZ {
+                            pos: PrimeCountVector::new(threes, fives, params.grid_z + 1),
+                            neg: PrimeCountVector::new(threes, fives, params.grid_z - 1),
+                        })
                     } else {
                         None
                     },
