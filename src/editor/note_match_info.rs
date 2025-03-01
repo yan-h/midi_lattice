@@ -1,14 +1,11 @@
 use std::sync::{Arc, Mutex};
 
-use nih_plug_vizia::vizia::{
-    prelude::*,
-    vg::{self, FontId},
-};
+use nih_plug_vizia::vizia::{prelude::*, vg};
 use triple_buffer::Output;
 
 use crate::editor::color::*;
 use crate::tuning::*;
-use crate::{assets, MidiLatticeParams, Voices};
+use crate::{MidiLatticeParams, Voices};
 
 use crate::editor::lattice::grid::get_sorted_grid_pitch_classes;
 
@@ -96,7 +93,11 @@ impl View for NoteMatchInfo {
         } else if num_voices == num_matched_voices as usize {
             format!("All {} notes matched", num_matched_voices)
         } else {
-            format!("{}/{} notes matched", num_matched_voices, voice_pitch_classes.len())
+            format!(
+                "{}/{} notes matched",
+                num_matched_voices,
+                voice_pitch_classes.len()
+            )
         };
 
         let mut text_paint = vg::Paint::color(TEXT_COLOR);
