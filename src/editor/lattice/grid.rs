@@ -257,7 +257,7 @@ impl DrawGridArgs {
 
         let sorted_voices = grid.get_sorted_voices();
 
-        let highlight_duration =
+        let highlight_duration: Duration =
             Duration::from_secs_f32(grid.params.grid_params.highlight_time.value());
 
         let highlighted_pitch_classes =
@@ -887,6 +887,7 @@ fn get_mini_node_pos(
         ),
     }
 }
+
 /// Draw a node with a factor of 7 in the pitch class.
 /// This is a small rounded rectangle on the top right or bottom left of the "main" nodes
 fn draw_node_nonzero_z(canvas: &mut Canvas, args: &DrawGridArgs, node_args: &DrawNodeArgs) {

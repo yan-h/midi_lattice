@@ -6,6 +6,7 @@ use crate::editor::lattice::Lattice;
 use crate::editor::note_spectrum::NoteSpectrum;
 use crate::editor::resizer::Resizer;
 use crate::editor::tuning_learn_button::TuningLearnButton;
+use crate::editor::note_match_info::NoteMatchInfo;
 use crate::MidiLatticeParams;
 use crate::Voices;
 use nih_plug_vizia::vizia::vg;
@@ -26,6 +27,7 @@ mod lattice;
 mod note_spectrum;
 mod resizer;
 mod tuning_learn_button;
+mod note_match_info;
 
 pub const BOTTOM_REGION_HEIGHT: f32 = grid::NODE_SIZE * 0.618 + PADDING;
 pub const RIGHT_REGION_WIDTH: f32 = grid::NODE_SIZE * 0.618 + PADDING;
@@ -118,26 +120,6 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
 
             data.clone().build(cx);
 
-            HStack::new(cx, |cx| {
-                let button_dimensions = BOTTOM_REGION_HEIGHT - PADDING;
-
-                TuningLearnButton::new(
-                    cx,
-                    Data::params.map(|p| p.tuning_params.clone()),
-                    Data::voices_output,
-                )
-                .position_type(PositionType::ParentDirected)
-                .left(Units::Pixels(0.0))
-                .height(Units::Pixels(button_dimensions))
-                .width(Units::Pixels(button_dimensions));
-            })
-            .position_type(PositionType::SelfDirected)
-            .top(Units::Stretch(1.0))
-            .bottom(Units::Pixels(PADDING))
-            .left(Units::Pixels(PADDING))
-            .right(Units::Pixels(PADDING))
-            .height(Units::Pixels(BOTTOM_REGION_HEIGHT - PADDING));
-
             Lattice::new(cx, Data::params, Data::voices_output)
                 .position_type(PositionType::SelfDirected)
                 .bottom(Units::Pixels(BOTTOM_REGION_HEIGHT))
@@ -157,14 +139,37 @@ pub fn create(data: Data) -> Option<Box<dyn Editor>> {
             .bottom(Units::Pixels(BOTTOM_REGION_HEIGHT + PADDING))
             .width(Units::Pixels(RIGHT_REGION_WIDTH - PADDING));
 
-            Resizer::new(cx)
-                .position_type(PositionType::SelfDirected)
-                .right(Units::Pixels(PADDING))
+            HStack::new(cx, |cx| {
+                let button_dimensions = BOTTOM_REGION_HEIGHT - PADDING;
+
+                TuningLearnButton::new(
+                    cx,
+                    Data::params.map(|p| p.tuning_params.clone()),
+                    Data::voices_output,
+                )
+                .position_type(PositionType::ParentDirected)
+                .left(Units::Pixels(0.0))
+                .height(Units::Pixels(button_dimensions))
+                .width(Units::Pixels(button_dimensions));
+
+                NoteMatchInfo::new(cx, Data::params, Data::voices_output)
+                .left(Units::Pixels(PADDING))
+                .right(Units::Pixels(PADDING));
+
+                Resizer::new(cx)
+                .position_type(PositionType::ParentDirected)
                 .bottom(Units::Pixels(PADDING))
-                .top(Units::Stretch(1.0))
-                .left(Units::Stretch(1.0))
                 .width(Units::Pixels(RIGHT_REGION_WIDTH - PADDING))
                 .height(Units::Pixels(BOTTOM_REGION_HEIGHT - PADDING));
+            })
+            .position_type(PositionType::SelfDirected)
+            .top(Units::Stretch(1.0))
+            .bottom(Units::Pixels(PADDING))
+            .left(Units::Pixels(PADDING))
+            .right(Units::Pixels(PADDING))
+            .height(Units::Pixels(BOTTOM_REGION_HEIGHT - PADDING));
+
+            
         },
     )
 }
