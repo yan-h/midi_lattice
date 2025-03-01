@@ -134,7 +134,7 @@ impl Default for GridParams {
             show_z_axis: EnumParam::new("Show Z Axis", ShowZAxis::Auto),
             darkest_pitch: FloatParam::new(
                 "Darkest pitch",
-                30.0,
+                24.0,
                 FloatRange::Linear {
                     min: 0.0,
                     max: 60.0,
@@ -142,7 +142,7 @@ impl Default for GridParams {
             ),
             brightest_pitch: FloatParam::new(
                 "Brightest pitch",
-                90.0,
+                108.0,
                 FloatRange::Linear {
                     min: 60.0,
                     max: 120.0,
