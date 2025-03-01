@@ -89,6 +89,10 @@ impl PitchClass {
         PitchClass(u32::from(note % 12) * MIDI_NOTE_TO_CENTS * CENTS_TO_MICROCENTS)
     }
 
+    pub fn from_midi_note_f32(note: f32) -> Self {
+        return PitchClass::from_cents_f32(note * 100.0);
+    }
+
     pub fn from_cents_f32(cents: f32) -> Self {
         PitchClass((cents.rem_euclid(1200.0) * CENTS_TO_MICROCENTS_F32).round() as u32)
     }

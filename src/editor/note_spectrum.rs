@@ -1,6 +1,7 @@
 use crate::midi::MidiVoice;
-use crate::GridParams;
+use crate::tuning::*;
 
+use crate::MidiLatticeParams;
 use crate::Voices;
 
 use nih_plug_vizia::vizia::prelude::*;
@@ -12,8 +13,10 @@ use crate::editor::color::*;
 
 use crate::editor::CORNER_RADIUS;
 
+use super::lattice::grid::get_sorted_grid_pitch_classes;
+
 pub struct NoteSpectrum {
-    params: Arc<GridParams>,
+    params: Arc<MidiLatticeParams>,
     voices_output: Arc<Mutex<Output<Voices>>>,
 }
 
@@ -24,7 +27,7 @@ impl NoteSpectrum {
         voices_output: LVoices,
     ) -> Handle<Self>
     where
-        LParams: Lens<Target = Arc<GridParams>>,
+        LParams: Lens<Target = Arc<MidiLatticeParams>>,
         LVoices: Lens<Target = Arc<Mutex<Output<Voices>>>>,
     {
         Self {
@@ -57,10 +60,17 @@ impl View for NoteSpectrum {
         let min_pitch: f32 = 60.0 - 12.0 * 3.0;
         let max_pitch: f32 = 60.0 + 12.0 * 4.0;
 
-        // Draw notes
+        // Set up data structures
         let mut voices_output = self.voices_output.lock().unwrap();
         let voices: Vec<MidiVoice> = voices_output.read().values().cloned().collect();
         std::mem::drop(voices_output);
+
+        let sorted_grid_pitch_classes: Vec<PitchClass> =
+            get_sorted_grid_pitch_classes(&self.params);
+        let tuning_tolerance =
+            PitchClassDistance::from_cents_f32(self.params.tuning_params.tolerance.value());
+
+        // Draw voices
         for voice in voices {
             if voice.get_channel() == 15 {
                 continue;
@@ -69,8 +79,8 @@ impl View for NoteSpectrum {
             let color = note_color(
                 voice.get_channel(),
                 pitch,
-                self.params.darkest_pitch.value(),
-                self.params.brightest_pitch.value(),
+                self.params.grid_params.darkest_pitch.value(),
+                self.params.grid_params.brightest_pitch.value(),
             );
 
             let pitch_idx = if pitch < min_pitch {
@@ -81,9 +91,22 @@ impl View for NoteSpectrum {
                 (pitch - min_pitch) / (max_pitch - min_pitch)
             };
 
+            let matches_grid_pitch_class = pitch_class_matches_any_in_sorted_vec(
+                PitchClass::from_midi_note_f32(pitch),
+                &sorted_grid_pitch_classes,
+                tuning_tolerance,
+            );
             let mut pitch_path = vg::Path::new();
+
+            let start_x = cx.bounds().x
+                + if matches_grid_pitch_class {
+                    0.0
+                } else {
+                    0.2 * cx.bounds().width()
+                };
+
             pitch_path.move_to(
-                cx.bounds().x,
+                start_x,
                 cx.bounds().y + cx.bounds().height() - pitch_idx * cx.bounds().height(),
             );
             pitch_path.line_to(
