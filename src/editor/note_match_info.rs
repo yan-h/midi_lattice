@@ -88,17 +88,7 @@ impl View for NoteMatchInfo {
 
         // Draw text
         let num_voices = voice_pitch_classes.len();
-        let text_to_display: String = if num_voices == 0 {
-            "No notes playing".to_string()
-        } else if num_voices == num_matched_voices as usize {
-            format!("All {} notes matched", num_matched_voices)
-        } else {
-            format!(
-                "{}/{} notes matched",
-                num_matched_voices,
-                voice_pitch_classes.len()
-            )
-        };
+        let text_to_display: String = matched_notes_string(num_voices, num_matched_voices as usize);
 
         let mut text_paint = vg::Paint::color(TEXT_COLOR);
         text_paint.set_text_align(vg::Align::Left);
@@ -110,4 +100,12 @@ impl View for NoteMatchInfo {
             &text_paint,
         );
     }
+}
+
+fn matched_notes_string(num_voices: usize, num_matched_voices: usize) -> String {
+    return if num_voices == num_matched_voices {
+        format!("All notes matched ({})", num_matched_voices)
+    } else {
+        format!("{}/{} notes matched", num_matched_voices, num_voices)
+    };
 }
