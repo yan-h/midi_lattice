@@ -4,7 +4,9 @@
 
 A VST3/CLAP plugin for visualizing the pitch classes of incoming MIDI notes on a [lattice](https://en.wikipedia.org/wiki/Lattice_(music)). Uses the [nih-plug](https://github.com/robbert-vdh/nih-plug) Rust audio plugin framework. Mostly tested with Bitwig Studio on Mac.
 
-The plugin displays the pitch classes of incoming notes on a 2D grid, where going upward is a perfect fifth (e.g. C to G), and going right is a major third (e.g. C to E). The tuning of perfect fifths and major thirds is configurable, so the plugin effectively supports any approximation of [5-limit tuning](https://en.wikipedia.org/wiki/Five-limit_tuning). I use it to check my tuning when experimenting with different tuning systems.
+I use it to visualize the harmonies of my personal pieces, which I upload to [YouTube](https://www.youtube.com/@septimal_lemon). I also use it to check my tuning when experimenting with tuning systems.
+
+The plugin displays the pitch classes of incoming notes on a 2D grid, where going upward is a perfect fifth (e.g. C to G), and going right is a major third (e.g. C to E). The tuning of perfect fifths and major thirds is configurable, so the plugin effectively supports any approximation of [5-limit tuning](https://en.wikipedia.org/wiki/Five-limit_tuning). 
 
 Harmonic sevenths can optionally be shown on the top-right (+1) and bottom-left (-1) corners of each note on the lattice. So the plugin has some support for approximations of [7-limit tuning](https://en.wikipedia.org/wiki/7-limit_tuning) as well. To avoid visual clutter, these "z-axis" notes are not displayed except when they play.
 
