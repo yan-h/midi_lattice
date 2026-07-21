@@ -3,7 +3,7 @@ name = "midi_lattice"
 version = "0.1.0"
 edition = "2021"
 authors = ["Yan Han <yanhan13@gmail.com>"]
-license = "ISC"
+license = "MIT"
 homepage = "https://youtu.be/dQw4w9WgXcQ"
 description = "Visualizes incoming MIDI in a tuning lattice"
 
